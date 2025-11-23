@@ -1,0 +1,15 @@
+# Python Virtual Env (nicht hochladen!)
+bin/
+lib/
+include/
+share/
+etc/
+pyvenv.cfg
+.Python
+
+# Mac Systemdateien
+.DS_Store
+
+# Bytecode
+__pycache__/
+*.pyc
