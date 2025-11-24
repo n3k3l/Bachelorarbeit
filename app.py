@@ -12,7 +12,7 @@ from io import BytesIO
 # ───────────────────────────────────────────
 st.set_page_config(layout="wide", page_title="Circadian Analysis")
 
-# OPTIMIZED CSS FOR GRAY BACKGROUND & HIGH CONTRAST TEXT
+# OPTIMIZED CSS
 st.markdown("""
     <style>
     /* 1. Main Background color (Light Professional Gray) */
@@ -20,13 +20,41 @@ st.markdown("""
         background-color: #f0f2f6;
     }
     
-    /* 2. Force Text Color to Dark Gray/Black for contrast */
-    h1, h2, h3, h4, h5, h6, .stMarkdown, p, span, label, div {
+    /* 2. General Text Color (Dark Gray/Black for readability on page) */
+    h1, h2, h3, h4, h5, h6, .stMarkdown, p, label {
         color: #1f1f1f !important;
         font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
     }
     
-    /* 3. Style the Tabs to look like cards */
+    /* 3. INPUT FIELDS & DROPDOWNS -> DARK BG / WHITE FONT */
+    
+    /* Input Boxes (Number, Text, Time) */
+    div[data-baseweb="input"] {
+        background-color: #4a4a4a !important; /* Dark Gray Background */
+        border: 1px solid #666 !important;
+    }
+    input.st-ai, input.st-ah {
+        color: #ffffff !important; /* White Font */
+    }
+    
+    /* Dropdowns (Selectbox) Container */
+    div[data-baseweb="select"] > div {
+        background-color: #4a4a4a !important; /* Dark Gray Background */
+        color: #ffffff !important;             /* White Font */
+        border: 1px solid #666 !important;
+    }
+    
+    /* Text inside Dropdowns */
+    div[data-baseweb="select"] span {
+        color: #ffffff !important;
+    }
+    
+    /* Dropdown Arrow Icon */
+    div[data-baseweb="select"] svg {
+        fill: #ffffff !important;
+    }
+    
+    /* 4. Tabs styling */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
     }
@@ -43,16 +71,16 @@ st.markdown("""
         font-weight: bold;
     }
     
-    /* 4. Make Dataframes and Inputs pop on gray background */
-    .stDataFrame, .stTable {
-        background-color: white;
+    /* 5. Slider Text (Make sure numbers are visible) */
+    div[data-testid="stThumbValue"] {
+        color: #1f1f1f !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # Set global plot style
 sns.set_style("whitegrid")
-# Ensure text in plots is dark
+# Ensure text in plots is dark (since plot bg is white)
 plt.rcParams['text.color'] = '#1f1f1f'
 plt.rcParams['axes.labelcolor'] = '#1f1f1f'
 plt.rcParams['xtick.color'] = '#1f1f1f'
@@ -248,9 +276,9 @@ with tab1:
             delta_h = st.slider("Δ Time t₂ (h)", 0.0, 24.0, 6.0, 0.25)
             t2_hour = (t1_hour + delta_h) % 24
             
-            # t1: Black Solid, t2: Green Dashed
+            # t1: Black Solid, t2: ORANGE Dashed (Updated)
             ax_cm.axhline(t1_hour, color='black', ls='-', lw=2.5, label='t₁')
-            ax_cm.axvline(t2_hour, color='#2ca02c', ls='--', lw=2.5, label='t₂') # Stronger Green
+            ax_cm.axvline(t2_hour, color='#ff7f0e', ls='--', lw=2.5, label='t₂') 
             
             ax_cm.plot(t2_hour, t1_hour, 'ko', markersize=7, mfc='white')
             ax_cm.set_xlabel("Timepoint t₂"); ax_cm.set_ylabel("Timepoint t₁")
@@ -281,9 +309,9 @@ with tab1:
             
             y1_d = y_t1/conv; y2_d = y_t2/conv
             
-            # t1: Black Solid, t2: Green Dashed
+            # t1: Black Solid, t2: ORANGE Dashed (Updated)
             ax_clk.plot([theta1, theta1], [0, r1], color='black', lw=3, ls='-', label=f"t₁ ({y1_d:.1f})")
-            ax_clk.plot([theta2, theta2], [0, r2], color='#2ca02c', lw=3, ls='--', label=f"t₂ ({y2_d:.1f})")
+            ax_clk.plot([theta2, theta2], [0, r2], color='#ff7f0e', lw=3, ls='--', label=f"t₂ ({y2_d:.1f})")
             
             ax_clk.legend(loc="lower center", bbox_to_anchor=(0.5, -0.2), ncol=1, frameon=True, facecolor='white')
             st.pyplot(fig_clk)
