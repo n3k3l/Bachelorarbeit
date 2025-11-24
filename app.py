@@ -247,12 +247,13 @@ with tab1:
         mu_abs = M * MU_perc / 100
 
     with right:
+        # Berechnungen für die Plots
         t_arr = np.linspace(0, 24, 500)
         y_arr = circadian(t_arr, M, A, t0)
         y_disp = y_arr / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else y_arr
         mu_disp = mu_abs / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else mu_abs
 
-        # Main Plot with White Background (Card Style)
+        # 1. Main Plot (Card Style)
         fig_sin, ax_sin = plt.subplots(figsize=(10, 3.5), facecolor='white')
         ax_sin.set_title(f"Simulated Diurnal Fluctuation for {analyte}", fontsize=12)
         ax_sin.plot(t_arr, y_disp, color="cornflowerblue", alpha=0.9, lw=2, label="Expected Profile")
@@ -271,34 +272,22 @@ with tab1:
         st.pyplot(fig_sin)
         plt.close(fig_sin)
         
-        c1, c2 = st.columns(2, gap="medium")
-        y_t1 = circadian(t1_hour, M, A, t0)
+        st.markdown("---")
+
+        # --- NEUE STRUKTUR FÜR GLEICHE HÖHE ---
         
-        with c1:
+        # Zeile 1: Controls & Status (Slider links, Status Box rechts)
+        row1_c1, row1_c2 = st.columns(2, gap="medium")
+        
+        with row1_c1:
             st.markdown("##### Chronomap")
-            T1, T2, delta = chronomap_delta(A, M, t0)
-            delta_disp = delta / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else delta
-            
-            fig_cm, ax_cm = plt.subplots(figsize=(5, 5), facecolor='white')
-            pcm = ax_cm.pcolormesh(T2, T1, delta_disp, cmap="coolwarm", shading='gouraud')
-            fig_cm.colorbar(pcm, ax=ax_cm, label=f"Diff ({unit})", fraction=0.046, pad=0.04)
-            ax_cm.contour(T2, T1, delta, levels=[mu_abs], colors='black', linestyles='dotted')
-            
             delta_h = st.slider("Δ Time t₂ (h)", 0.0, 24.0, 6.0, 0.25)
             t2_hour = (t1_hour + delta_h) % 24
             
-            # t1: Black Solid, t2: ORANGE Dashed (Updated)
-            ax_cm.axhline(t1_hour, color='black', ls='-', lw=2.5, label='t₁')
-            ax_cm.axvline(t2_hour, color='#ff7f0e', ls='--', lw=2.5, label='t₂') 
-            
-            ax_cm.plot(t2_hour, t1_hour, 'ko', markersize=7, mfc='white')
-            ax_cm.set_xlabel("Timepoint t₂"); ax_cm.set_ylabel("Timepoint t₁")
-            ax_cm.legend(fontsize='x-small', loc='upper right', frameon=True, facecolor='white')
-            st.pyplot(fig_cm)
-            plt.close(fig_cm)
-            
-        with c2:
+        with row1_c2:
             st.markdown("##### 24h Clock Comparison")
+            # Berechnung hier durchführen für Status Box
+            y_t1 = circadian(t1_hour, M, A, t0)
             y_t2 = circadian(t2_hour, M, A, t0)
             diff = abs(y_t1 - y_t2)
             conv = GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else 1.0
@@ -307,11 +296,45 @@ with tab1:
                 st.success(f"**Comparable**\nΔ = {diff/conv:.1f} (≤ {mu_abs/conv:.1f})")
             else: 
                 st.error(f"**Not Comparable**\nΔ = {diff/conv:.1f} (> {mu_abs/conv:.1f})")
+
+        # Zeile 2: Die Diagramme (Nebeneinander, starten auf gleicher Höhe)
+        row2_c1, row2_c2 = st.columns(2, gap="medium")
+        
+        # --- Plot Links: Chronomap ---
+        with row2_c1:
+            T1, T2, delta = chronomap_delta(A, M, t0)
+            delta_disp = delta / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else delta
             
+            # Quadratische Figure Size für Heatmap
+            fig_cm, ax_cm = plt.subplots(figsize=(5, 5), facecolor='white')
+            pcm = ax_cm.pcolormesh(T2, T1, delta_disp, cmap="coolwarm", shading='gouraud')
+            
+            # Colorbar etwas kleiner machen, damit Plot quadratisch bleibt
+            fig_cm.colorbar(pcm, ax=ax_cm, label=f"Diff ({unit})", fraction=0.046, pad=0.04)
+            
+            ax_cm.contour(T2, T1, delta, levels=[mu_abs], colors='black', linestyles='dotted')
+            
+            # Linien: t1 Schwarz, t2 Orange
+            ax_cm.axhline(t1_hour, color='black', ls='-', lw=2.5, label='t₁')
+            ax_cm.axvline(t2_hour, color='#ff7f0e', ls='--', lw=2.5, label='t₂') 
+            
+            ax_cm.plot(t2_hour, t1_hour, 'ko', markersize=7, mfc='white')
+            ax_cm.set_xlabel("Timepoint t₂"); ax_cm.set_ylabel("Timepoint t₁")
+            # Legende oben rechts innerhalb des Plots
+            ax_cm.legend(fontsize='x-small', loc='upper right', frameon=True, facecolor='white', framealpha=0.9)
+            
+            # Wichtig: Tight Layout entfernt unnötige Ränder
+            plt.tight_layout()
+            st.pyplot(fig_cm, use_container_width=True)
+            plt.close(fig_cm)
+            
+        # --- Plot Rechts: Polar Clock ---
+        with row2_c2:
             norm = lambda y: 0.1 + 0.9 * ((y - (M-A)) / (2*A))
             r1, r2 = np.clip(norm(y_t1), 0, 1), np.clip(norm(y_t2), 0, 1)
             theta1, theta2 = (t1_hour/24)*2*np.pi, (t2_hour/24)*2*np.pi
             
+            # Gleiche Figure Size wie Heatmap
             fig_clk, ax_clk = plt.subplots(subplot_kw={'projection':'polar'}, figsize=(5, 5), facecolor='white')
             ax_clk.set_theta_offset(np.pi/2); ax_clk.set_theta_direction(-1)
             ax_clk.set_xticks(np.linspace(0, 2*np.pi, 12, endpoint=False))
@@ -320,14 +343,18 @@ with tab1:
             
             y1_d = y_t1/conv; y2_d = y_t2/conv
             
-            # t1: Black Solid, t2: ORANGE Dashed (Updated)
+            # Linien: t1 Schwarz, t2 Orange
             ax_clk.plot([theta1, theta1], [0, r1], color='black', lw=3, ls='-', label=f"t₁ ({y1_d:.1f})")
             ax_clk.plot([theta2, theta2], [0, r2], color='#ff7f0e', lw=3, ls='--', label=f"t₂ ({y2_d:.1f})")
             
-            ax_clk.legend(loc="lower center", bbox_to_anchor=(0.5, -0.2), ncol=1, frameon=True, facecolor='white')
-            st.pyplot(fig_clk)
+            # Legende unten mittig
+            ax_clk.legend(loc="lower center", bbox_to_anchor=(0.5, -0.15), ncol=1, frameon=True, facecolor='white')
+            
+            # Wichtig: Tight Layout sorgt dafür, dass die Uhr den Platz füllt wie die Heatmap
+            plt.tight_layout()
+            st.pyplot(fig_clk, use_container_width=True)
             plt.close(fig_clk)
-
+            
 # --- TAB 2: DATA ANALYSIS ---
 with tab2:
     st.markdown("### 1. Data Import")
