@@ -10,43 +10,51 @@ from scipy.optimize import curve_fit
 # BASIC SETTINGS & LAYOUT
 # ───────────────────────────────────────────
 st.set_page_config(layout="wide", page_title="Circadian Rhythm Analysis")
-sns.set_style("whitegrid")  # Apply clean style to plots
+sns.set_style("whitegrid")
 
-st.markdown("<h2 style='text-align:center; margin-bottom: 25px;'>Visualization & Analysis of Diurnal Fluctuations</h2>", unsafe_allow_html=True)
+# CSS für grauen Hintergrund
+st.markdown("""
+    <style>
+    .stApp {
+        background-color: #f0f2f6;
+    }
+    .block-container {
+        background-color: #ffffff;
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+st.markdown("<h2 style='text-align:center; margin-bottom: 25px; color: #333;'>Visualization & Analysis of Diurnal Fluctuations</h2>", unsafe_allow_html=True)
 
 # ───────────────────────────────────────────
 # 1) LITERATURE/DEFAULT VALUES & CONSTANTS
 # ───────────────────────────────────────────
-# Default parameters based on literature for different analytes and genders
 default_params = {
     ("Glucose", "Male"):    {"t0": 8.5, "A": 15, "MU": 12, "M": 100},
     ("Glucose", "Female"):  {"t0": 9.0, "A": 13, "MU": 11, "M":  95},
-    ("Cortisol", "Male"):   {"t0": 7.0, "A": 20, "MU": 10, "M": 180},
-    ("Cortisol", "Female"): {"t0": 7.5, "A": 18, "MU": 10, "M": 170},
+    ("Cortisol", "Male"):   {"t0": 7.0, "A": 5, "MU": 10, "M": 15}, # Adjusted for ug/dl scale example
+    ("Cortisol", "Female"): {"t0": 7.5, "A": 4, "MU": 10, "M": 14},
     ("Other", "Male"):      {"t0": 4.0, "A": 10, "MU": 15, "M": 100},
     ("Other", "Female"):    {"t0": 4.5, "A": 10, "MU": 15, "M":  95},
 }
-# Conversion factor for glucose: mg/dL <-> mmol/L
 GLUCOSE_CONVERSION_FACTOR = 18.016
 
 # ───────────────────────────────────────────
 # 2) HELPER FUNCTIONS (GLOBAL SCOPE)
 # ───────────────────────────────────────────
 def circadian(t, M, A, t0):
-    """Cosine function to model circadian rhythm: y = M + A * cos(2*pi*(t-t0)/24)."""
     return M + A * np.cos(2 * np.pi * (t - t0) / 24)
 
 def format_time_string(decimal_hour):
-    """Formats a decimal hour (e.g., 8.5) into a time string (e.g., '08:30')."""
     hours = int(decimal_hour)
     minutes = int(round((decimal_hour - hours) * 60))
-    if minutes == 60:
-        hours += 1
-        minutes = 0
+    if minutes == 60: hours += 1; minutes = 0
     return f"{hours % 24:02d}:{minutes:02d}"
 
 def chronomap_delta(A, M, t0, steps=100):
-    """Calculates the absolute difference between circadian values at all pairs of timepoints."""
     t_vals = np.linspace(0, 24, steps)
     T1, T2 = np.meshgrid(t_vals, t_vals)
     Y1 = circadian(T1, M, A, t0)
@@ -54,87 +62,85 @@ def chronomap_delta(A, M, t0, steps=100):
     return T1, T2, np.abs(Y1 - Y2)
 
 @st.cache_data
+def get_template_csv():
+    """Generates a sample CSV matching the user's screenshot."""
+    data = {
+        "ANALYT": ["Cholesterin", "Glucose", "Cortisol", "Glucose", "Cortisol"],
+        "VALUE": [167.0, 95.0, 14.5, 110.0, 8.2],
+        "DIM": ["mg/dl", "mg/dl", "ug/dl", "mg/dl", "ug/dl"],
+        "TIME": ["27.11.2013 16:06", "27.11.2013 08:30", "27.11.2013 20:00", "27.11.2013 14:00", "28.11.2013 02:00"],
+        "SEX": ["M", "F", "M", "M", "F"],
+        "AGE": [47, 32, 55, 45, 29]
+    }
+    return pd.DataFrame(data).to_csv(index=False).encode('utf-8')
+
+@st.cache_data
 def load_and_process_data(_file, file_identifier):
-    """
-    Loads and preprocesses the uploaded CSV data.
-    Expects columns roughly matching: Age, Gender, Analyse_date, Value.
-    """
     try:
-        # Read CSV with auto-separator detection
         df = pd.read_csv(_file, sep=None, engine='python')
-        df.columns = df.columns.str.strip()
+        df.columns = df.columns.str.strip().str.upper() # Normalize to uppercase
         
-        # Map flexible column names to standard internal names
-        # 'Value' is assumed to be the analyte concentration
+        # Flexible Mapping based on Screenshot
+        # Expected: ANALYT, VALUE, DIM, TIME, SEX, AGE
         COLUMN_MAP = {
-            'Age': 'age', 
-            'Gender': 'gender', 
-            'Analyse_date': 'timestamp', 
-            'Value': 'glucose_mmol_l'
+            'ANALYT': 'analyte',
+            'VALUE': 'value',
+            'DIM': 'unit',
+            'TIME': 'timestamp',
+            'SEX': 'gender',
+            'AGE': 'age'
         }
         
-        # Check for missing columns
-        required_cols = set(COLUMN_MAP.keys())
-        found_cols = set(df.columns)
-        if not required_cols.issubset(found_cols):
-            st.error(f"Error in '{file_identifier}': Missing columns: {list(required_cols - found_cols)}")
-            st.warning(f"Found columns: {list(found_cols)}")
-            return None
-            
+        # Rename available columns
         df = df.rename(columns=COLUMN_MAP)
         
-        # Clean Data: Handle decimal commas if present (e.g. "5,5" -> "5.5")
-        if df['glucose_mmol_l'].dtype == object:
-            df['glucose_mmol_l'] = df['glucose_mmol_l'].astype(str).str.replace(',', '.', regex=False)
+        # Check requirements (Time and Value are minimum)
+        if 'timestamp' not in df.columns or 'value' not in df.columns:
+            st.error(f"Error in '{file_identifier}': Missing crucial columns (TIME or VALUE). Found: {df.columns.tolist()}")
+            return None
             
-        # Convert to numeric, coercing errors to NaN
-        df['glucose_mmol_l'] = pd.to_numeric(df['glucose_mmol_l'], errors='coerce')
+        # 1. Handle Value
+        if df['value'].dtype == object:
+            df['value'] = df['value'].astype(str).str.replace(',', '.', regex=False)
+        df['value'] = pd.to_numeric(df['value'], errors='coerce')
         
-        # Determine health status (simple threshold logic for demo)
-        df['health_status'] = np.where(df['glucose_mmol_l'] >= 11.1, 'Sick', 'Healthy')
-        
-        # Remove invalid rows
-        df.dropna(subset=['glucose_mmol_l', 'age'], inplace=True)
-        
-        df['age'] = df['age'].astype(int)
+        # 2. Handle Time
         df['timestamp'] = pd.to_datetime(df['timestamp'], dayfirst=True, errors='coerce')
-        df.dropna(subset=['timestamp'], inplace=True)
-        
-        # Extract hour and normalize gender
+        df.dropna(subset=['timestamp', 'value'], inplace=True)
         df['hour_int'] = df['timestamp'].dt.hour
-        if 'gender' in df.columns:
-            df['gender'] = df['gender'].astype(str).str.upper().map({'M': 'Male', 'F': 'Female'}).fillna('Other')
-            
-        # Create Age Groups
-        df['age_group'] = pd.cut(df['age'], bins=[0, 30, 50, 120], labels=["< 30 years", "30-50 years", "> 50 years"], right=False)
-        df['source_file'] = file_identifier
         
+        # 3. Handle Missing Gender -> Group all
+        if 'gender' not in df.columns:
+            df['gender'] = 'All'
+        else:
+            df['gender'] = df['gender'].astype(str).str.upper().map({'M': 'Male', 'F': 'Female'}).fillna('All')
+
+        # 4. Handle Missing Age -> Group all
+        if 'age' not in df.columns:
+            df['age_group'] = 'All Ages'
+        else:
+            df['age'] = pd.to_numeric(df['age'], errors='coerce').fillna(0).astype(int)
+            df['age_group'] = pd.cut(df['age'], bins=[0, 30, 50, 120], labels=["< 30 years", "30-50 years", "> 50 years"], right=False)
+            df['age_group'] = df['age_group'].astype(str).replace('nan', 'All Ages')
+
+        # 5. Handle Missing Analyte -> Default
+        if 'analyte' not in df.columns:
+            df['analyte'] = 'Unknown'
+            
+        df['source_file'] = file_identifier
         return df
     except Exception as e:
         st.error(f"Error processing '{file_identifier}': {e}")
         return None
 
-def get_fitted_parameters(df_group, value_column='glucose_mmol_l'):
-    """Fits the circadian model to a group of data and returns (M, A, t0)."""
-    # Need enough data points to fit
-    if len(df_group) < 10: 
-        return np.nan, np.nan, np.nan
-        
-    # Group by hour to get median trajectory
+def get_fitted_parameters(df_group, value_column='value'):
+    if len(df_group) < 5: return np.nan, np.nan, np.nan
     medians = df_group.groupby('hour_int')[value_column].median()
-    if len(medians) < 3: 
-        return np.nan, np.nan, np.nan
-        
+    if len(medians) < 3: return np.nan, np.nan, np.nan
     x_data, y_data = medians.index.values, medians.values
-    
-    # Initial Guesses
-    M_guess = np.mean(y_data)
-    A_guess = (np.max(y_data) - np.min(y_data)) / 2
-    # Guess peak time (t0) based on max value index
+    M_guess, A_guess = np.mean(y_data), (np.max(y_data) - np.min(y_data)) / 2
     t0_guess = x_data[np.argmax(y_data)]
-    
     try:
-        # Fit the cosine function
         popt, _ = curve_fit(circadian, x_data, y_data, p0=[M_guess, A_guess, t0_guess], maxfev=5000)
         return popt[0], popt[1], popt[2]
     except RuntimeError:
@@ -156,158 +162,153 @@ with tab1:
         c1, c2 = st.columns(2)
         analyte = c1.selectbox("Analyte", ["Glucose", "Cortisol", "Other"], key="analyte_sim")
         gender = c1.selectbox("Gender", ["Male", "Female"], key="gender_sim")
-        age = c2.slider("Age", 0, 100, 35, key="age_sim")
+        
+        # Determine Unit
+        if analyte == "Glucose":
+            unit = st.radio("Unit", ["mg/dL", "mmol/L"], horizontal=True)
+        elif analyte == "Cortisol":
+            unit = "ug/dL"
+            st.caption(f"Unit: {unit}")
+        else:
+            unit = "mg/dL"
+        
         t1_time = c2.time_input("Time t₁", value=datetime.time(8, 0), key="t1_sim")
         t1_hour  = t1_time.hour + t1_time.minute / 60
         
-        # Conditional Unit selection
-        unit = st.radio("Unit for Glucose", ["mg/dL", "mmol/L"], horizontal=True) if analyte == "Glucose" else "mg/dL"
-        
-        # Get default parameters
+        # Get defaults
         p = default_params.get((analyte, gender), default_params[("Other", "Male")])
         t0_lit, A_lit, MU_perc_lit, M_literature = p["t0"], p["A"], p["MU"], p["M"]
         
         st.markdown("**1. Adjust Model to Measured Value**")
-        personalize_mode = st.checkbox("Adjust Mean (M) to measured value at t₁", value=True)
-        
+        personalize_mode = st.checkbox("Adjust Mean (M) to t₁ value", value=True)
         M = M_literature
         
+        conv_factor = 1.0
+        if analyte == "Glucose" and unit == "mmol/L":
+            conv_factor = GLUCOSE_CONVERSION_FACTOR
+
         if personalize_mode:
-            # Display default value converted to selected unit
-            val_default = M_literature / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else float(M_literature)
+            val_default = M_literature / conv_factor
             step_val = 0.1 if unit == 'mmol/L' else 1.0
             
-            y_measured_t1_display = st.number_input(
-                f"Measured value at t₁ ({format_time_string(t1_hour)}) in {unit}", 
-                value=val_default, step=step_val, format="%.1f"
-            )
+            y_measured_t1_display = st.number_input(f"Value at t₁ ({format_time_string(t1_hour)})", value=val_default, step=step_val, format="%.1f")
             
-            # Convert input back to mg/dL for internal calculation
-            y_measured_t1_mgdl = y_measured_t1_display * GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else y_measured_t1_display
+            y_measured_internal = y_measured_t1_display * conv_factor
+            M = y_measured_internal - A_lit * np.cos(2 * np.pi * (t1_hour - t0_lit) / 24)
+            st.info(f"Adjusted Mean (M): **{M:.2f} (Internal Scale)**")
             
-            # Recalculate Mesor (M) so the curve hits the point exactly
-            M = y_measured_t1_mgdl - A_lit * np.cos(2 * np.pi * (t1_hour - t0_lit) / 24)
-            st.info(f"Adjusted Mean (M): **{M:.2f} mg/dL**")
-            
-        st.markdown("**2. Manually Adjust Parameters (Editor)**")
-        editor_mode = st.checkbox("Enable Editor Mode")
-        
-        # Initialize params
+        st.markdown("**2. Manual Adjustments**")
+        editor_mode = st.checkbox("Enable Editor")
         A, t0, MU_perc = A_lit, t0_lit, MU_perc_lit
         
         if editor_mode:
-            A = st.slider("Amplitude A (mg/dL)", 1.0, 50.0, float(A_lit), 0.5)
-            # Allow M editing only if not calculating it automatically
-            M = st.slider("Mean M (mg/dL)", 50.0, 250.0, float(M), 1.0, disabled=personalize_mode)
+            A = st.slider("Amplitude A", 0.5, 100.0, float(A_lit), 0.5)
+            M = st.slider("Mean M", 0.0, 500.0, float(M), 1.0, disabled=personalize_mode)
             t0 = st.slider("Acrophase t₀ (h)", 0.0, 24.0, t0_lit, 0.1)
-            MU_perc = st.slider("Measurement Uncertainty MU %", 1.0, 50.0, float(MU_perc_lit), 0.5)
+            MU_perc = st.slider("Uncertainty MU %", 1.0, 50.0, float(MU_perc_lit), 0.5)
         
         mu_abs = M * MU_perc / 100
 
     with right:
-        # --- Calculations for Plotting ---
+        # Arrays
         t_arr = np.linspace(0, 24, 500)
-        y_arr_mgdl = circadian(t_arr, M, A, t0)
+        y_arr = circadian(t_arr, M, A, t0)
         
-        # Convert arrays for display
-        y_arr_display = y_arr_mgdl / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else y_arr_mgdl
-        mu_abs_display = mu_abs / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else mu_abs
+        # Display Conversion
+        y_disp = y_arr / conv_factor
+        mu_disp = mu_abs / conv_factor
         
-        # --- Main Diurnal Curve Plot ---
-        fig_sin, ax_sin = plt.subplots(figsize=(10, 3))
-        ax_sin.set_title(f"Simulated Diurnal Fluctuation for {analyte}", fontsize=12)
-        ax_sin.plot(t_arr, y_arr_display, color="blue", label="Expected Daily Profile")
-        ax_sin.axvline(t1_hour, color="red", ls="--", label=f"t₁ = {format_time_string(t1_hour)}")
-        ax_sin.fill_between(t_arr, y_arr_display - mu_abs_display, y_arr_display + mu_abs_display, color="lightblue", alpha=0.5, label=f"Tolerance (±{MU_perc}%)")
+        # --- PLOT 1: Daily Profile ---
+        fig_sin, ax_sin = plt.subplots(figsize=(10, 3.5))
+        ax_sin.set_title(f"Simulated Profile: {analyte}", fontsize=12)
         
+        # Main Curve
+        ax_sin.plot(t_arr, y_disp, color="cornflowerblue", label="Profile")
+        ax_sin.fill_between(t_arr, y_disp - mu_disp, y_disp + mu_disp, color="lightblue", alpha=0.3)
+        
+        # t1 Line (Black Solid)
+        ax_sin.axvline(t1_hour, color="black", ls="-", lw=2, label=f"t₁ = {format_time_string(t1_hour)}")
         if personalize_mode:
-            y_t1_display = circadian(t1_hour, M, A, t0) / (GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else 1.0)
-            ax_sin.plot(t1_hour, y_t1_display, 'ro', markersize=6, label='Measured Value')
-            
-        ax_sin.set_xlabel("Time of Day (h)")
-        ax_sin.set_ylabel(f"Concentration ({unit})")
-        ax_sin.legend(fontsize='small')
+            y_t1_disp = circadian(t1_hour, M, A, t0) / conv_factor
+            ax_sin.plot(t1_hour, y_t1_disp, 'o', color='black', markersize=6)
+
         ax_sin.set_xlim(0, 24)
+        ax_sin.set_ylabel(f"Concentration ({unit})")
+        ax_sin.set_xlabel("Time (h)")
+        ax_sin.legend(loc="upper right", fontsize='small')
         st.pyplot(fig_sin)
         plt.close(fig_sin)
         
-        # --- Sub-plots (Chronomap & Clock) ---
+        # --- PLOT 2 & 3: Chronomap & Clock ---
         c1, c2 = st.columns(2, gap="medium")
         y_t1 = circadian(t1_hour, M, A, t0)
         
         with c1:
-            st.markdown("##### Chronomap: Comparability")
-            # Calculate delta map
+            st.markdown("##### Chronomap")
             T1, T2, delta_values = chronomap_delta(A, M, t0)
+            delta_disp = delta_values / conv_factor
             
-            # Convert delta values if necessary
-            if unit == 'mmol/L':
-                delta_values_display = delta_values / GLUCOSE_CONVERSION_FACTOR
-            else:
-                delta_values_display = delta_values
-
-            fig_cm, ax_cm = plt.subplots(figsize=(5, 4.5))
-            pcm = ax_cm.pcolormesh(T2, T1, delta_values_display, cmap="coolwarm", shading='gouraud')
-            fig_cm.colorbar(pcm, ax=ax_cm, label=f"Abs. Difference ({unit})")
+            # Square figure for alignment
+            fig_cm, ax_cm = plt.subplots(figsize=(5, 5))
+            pcm = ax_cm.pcolormesh(T2, T1, delta_disp, cmap="coolwarm", shading='gouraud')
             
-            # Contour line for Measurement Uncertainty
-            ax_cm.contour(T2, T1, delta_values, levels=[mu_abs], colors='black', linestyles='dashed')
+            # t1 (Black Solid)
+            ax_cm.axhline(t1_hour, color='black', ls='-', lw=2.5, label=f"t₁")
             
-            delta_h = st.slider("Time Difference t₂ ↔ t₁ (h)", 0.0, 24.0, 6.0, 0.25, key="delta_h_slider")
+            # Slider for t2
+            delta_h = st.slider("Diff t₂ ↔ t₁ (h)", 0.0, 24.0, 6.0, 0.5)
             t2_hour = (t1_hour + delta_h) % 24
             
-            ax_cm.axhline(t1_hour, color='white', ls='-', lw=2, label=f"t₁")
-            ax_cm.axvline(t2_hour, color='lime', ls='-', lw=2, label=f"t₂")
-            ax_cm.plot(t2_hour, t1_hour, 'ko', markersize=8, mfc='white')
+            # t2 (Orange Dashed)
+            ax_cm.axvline(t2_hour, color='orange', ls='--', lw=2.5, label=f"t₂")
             
-            ax_cm.set_xlabel("Timepoint t₂ (h)")
-            ax_cm.set_ylabel("Timepoint t₁ (h)")
-            ax_cm.set_xlim(0, 24); ax_cm.set_ylim(0, 24)
+            # Intercept
+            ax_cm.plot(t2_hour, t1_hour, 'o', markerfacecolor='white', markeredgecolor='black', markersize=8)
+            
+            # Contour
+            ax_cm.contour(T2, T1, delta_values, levels=[mu_abs], colors='gray', linestyles='dotted', linewidths=1)
+            
+            ax_cm.set_xlabel("Timepoint t₂")
+            ax_cm.set_ylabel("Timepoint t₁")
             ax_cm.set_aspect('equal')
             st.pyplot(fig_cm)
             plt.close(fig_cm)
             
         with c2:
-            st.markdown("##### Concentration on the 24h Clock")
+            st.markdown("##### 24h Clock")
             y_t2 = circadian(t2_hour, M, A, t0)
-            
-            # Comparison Check
             diff = abs(y_t1 - y_t2)
-            conv = GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else 1.0
             
+            # Status Box
             if diff <= mu_abs: 
-                st.success(f"**Comparable:** Δ = {diff/conv:.2f} (≤ {mu_abs/conv:.2f})")
+                st.success(f"**Comparable** (Δ ≤ Limit)")
             else: 
-                st.error(f"**Not comparable:** Δ = {diff/conv:.2f} (> {mu_abs/conv:.2f})")
-            
-            # Polar Plot Logic
-            min_val, max_val = M - A, M + A
-            range_val = max_val - min_val
-            # Normalize values 0.1 to 1.0 radius
-            norm = lambda y: 0.1 + 0.9 * np.clip((y - min_val) / range_val, 0, 1) if range_val > 0 else 0.5
-            
-            r1, r2 = norm(y_t1), norm(y_t2)
-            angle = lambda h: (h / 24.0) * 2 * np.pi
-            theta1, theta2 = angle(t1_hour), angle(t2_hour)
-            
-            fig_clk, ax_clk = plt.subplots(subplot_kw={'projection':'polar'}, figsize=(4.5, 4.5))
+                st.error(f"**Not Comparable** (Δ > Limit)")
+
+            # Polar Plot
+            fig_clk, ax_clk = plt.subplots(subplot_kw={'projection':'polar'}, figsize=(5, 5))
             ax_clk.set_theta_offset(np.pi/2)
             ax_clk.set_theta_direction(-1)
             ax_clk.set_xticks(np.linspace(0, 2*np.pi, 12, endpoint=False))
             ax_clk.set_xticklabels([f"{h*2}" for h in range(12)])
-            ax_clk.set_yticklabels([])
-            ax_clk.set_rlim(0, 1)
+            ax_clk.set_yticks([]) 
             
-            y_t1_disp = y_t1 / conv
-            y_t2_disp = y_t2 / conv
+            # Normalization
+            mn, mx = M - A*1.2, M + A*1.2
+            rng = mx - mn
+            norm = lambda v: 0.2 + 0.8 * ((v - mn)/rng)
             
-            label_t1 = f"t₁: {format_time_string(t1_hour)} ({y_t1_disp:.1f})"
-            label_t2 = f"t₂: {format_time_string(t2_hour)} ({y_t2_disp:.1f})"
+            r1, r2 = norm(y_t1), norm(y_t2)
+            th1, th2 = (t1_hour/24)*2*np.pi, (t2_hour/24)*2*np.pi
             
-            ax_clk.plot([theta1, theta1], [0, r1], color='red', lw=2.5, ls='--', label=label_t1)
-            ax_clk.plot([theta2, theta2], [0, r2], color='black', lw=2.5, label=label_t2)
+            # t1 (Black Solid)
+            ax_clk.plot([th1, th1], [0, r1], color='black', lw=3, ls='-', label=f"t₁ ({y_t1/conv_factor:.1f})")
             
-            ax_clk.legend(loc="lower center", bbox_to_anchor=(0.5, -0.3), ncol=1, fontsize='small')
+            # t2 (Orange Dashed)
+            ax_clk.plot([th2, th2], [0, r2], color='orange', lw=3, ls='--', label=f"t₂ ({y_t2/conv_factor:.1f})")
+            
+            ax_clk.set_ylim(0, 1)
+            ax_clk.legend(loc="lower center", bbox_to_anchor=(0.5, -0.15), frameon=False)
             st.pyplot(fig_clk)
             plt.close(fig_clk)
 
@@ -315,182 +316,151 @@ with tab1:
 # TAB 2: DATA ANALYSIS
 # ==========================================
 with tab2:
-    st.markdown("This section analyzes patient data to identify circadian patterns and enable comparisons.")
+    st.markdown("### Data Upload & Analysis")
     
-    upload_col1, upload_col2 = st.columns(2)
-    with upload_col1:
-        uploaded_file_1 = st.file_uploader("Upload File 1 (e.g., Control Group)", type=["csv"], key="file1")
-    with upload_col2:
-        uploaded_file_2 = st.file_uploader("Upload File 2 (e.g., Test Group)", type=["csv"], key="file2")
-
-    df1, df2 = None, None
-    if uploaded_file_1:
-        df1 = load_and_process_data(uploaded_file_1, "File 1")
-    if uploaded_file_2:
-        df2 = load_and_process_data(uploaded_file_2, "File 2")
+    # Template Download
+    st.download_button(
+        label="📥 Download CSV Template",
+        data=get_template_csv(),
+        file_name="circadian_template.csv",
+        mime="text/csv",
+        help="Use this structure: ANALYT, VALUE, DIM, TIME, SEX, AGE"
+    )
     
-    valid_dfs = [df for df in [df1, df2] if df is not None]
-
+    col_u1, col_u2 = st.columns(2)
+    with col_u1:
+        f1 = st.file_uploader("Upload Control Group (File 1)", type=["csv"], key="f1")
+    with col_u2:
+        f2 = st.file_uploader("Upload Test Group (File 2)", type=["csv"], key="f2")
+        
+    df1 = load_and_process_data(f1, "File 1") if f1 else None
+    df2 = load_and_process_data(f2, "File 2") if f2 else None
+    
+    valid_dfs = [d for d in [df1, df2] if d is not None]
+    
     if valid_dfs:
-        df_combined = pd.concat(valid_dfs, ignore_index=True)
+        df_all = pd.concat(valid_dfs, ignore_index=True)
+        st.success(f"Loaded {len(df_all)} records.")
         
-        st.success(f"Data loaded successfully. Total: {len(df_combined)} measurements.")
+        # --- 1. FILTERING (Crucial Step: Analyte) ---
         st.markdown("---")
-        st.markdown("### 1. Exploratory Data Analysis")
+        st.subheader("1. Filter Data")
         
-        # --- Filtering Controls ---
-        c1, c2, c3 = st.columns(3)
-        gender_options = ["All Genders"] + sorted(list(df_combined['gender'].unique()))
-        # Safely get unique age groups that actually exist in data
-        age_options = ["All Age Groups"] + list(df_combined['age_group'].dropna().unique())
-        health_options = ["All (Healthy & Sick)"] + list(sorted(df_combined['health_status'].unique()))
-
-        gender_filter = c1.selectbox("Gender", gender_options, key="gender_data")
-        age_group_filter = c2.selectbox("Age Group", age_options, key="age_data")
-        health_status_filter = c3.selectbox("Health Status", health_options, key="health_data")
-
-        # --- Apply Filters ---
-        plot_df_base = df_combined.copy()
-        if gender_filter != "All Genders":
-            plot_df_base = plot_df_base[plot_df_base['gender'] == gender_filter]
-        if age_group_filter != "All Age Groups":
-            plot_df_base = plot_df_base[plot_df_base['age_group'] == age_group_filter]
-        if health_status_filter != "All (Healthy & Sick)":
-            plot_df_base = plot_df_base[plot_df_base['health_status'] == health_status_filter]
-
-        # --- Source Selection for Display ---
-        source_files = sorted(list(df_combined['source_file'].unique()))
-        if len(source_files) > 1:
-            display_mode = st.radio("Select data to display:", ["Combined"] + source_files, horizontal=True, key="display_mode_radio")
+        f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+        
+        # Analyte Filter (Mandatory)
+        avail_analytes = sorted(list(df_all['analyte'].unique()))
+        sel_analyte = f_col1.selectbox("Analyte", avail_analytes)
+        
+        # Apply Analyte Filter first
+        df_sub = df_all[df_all['analyte'] == sel_analyte].copy()
+        
+        # Determine Unit from Data
+        if 'unit' in df_sub.columns:
+            detected_units = df_sub['unit'].unique()
+            current_unit = detected_units[0] if len(detected_units) > 0 else "Unknown"
         else:
-            display_mode = source_files[0]
-
-        if display_mode == "Combined":
-            df_to_plot = plot_df_base
-            plot_color, line_color = 'mediumseagreen', 'darkgreen'
-        elif display_mode == "File 1":
-            df_to_plot = plot_df_base[plot_df_base['source_file'] == 'File 1']
-            plot_color, line_color = 'cornflowerblue', 'darkblue'
-        else: # File 2
-            df_to_plot = plot_df_base[plot_df_base['source_file'] == 'File 2']
-            plot_color, line_color = 'sandybrown', 'darkred'
+            current_unit = "Unknown"
             
-        title = f"Data for: {display_mode} (Filters: {gender_filter}, {age_group_filter}, {health_status_filter})"
+        st.caption(f"Showing data for **{sel_analyte}** (Unit: {current_unit})")
 
-        # --- Boxplot Visualization ---
-        fig_box, ax_box = plt.subplots(figsize=(15, 7))
-        ax_box.set_title(title)
-        ax_box.set_xlabel("Time of Day (h)")
-        ax_box.set_ylabel("Glucose (mmol/L)")
-        ax_box.set_xlim(-0.5, 23.5)
-        ax_box.set_xticks(np.arange(0, 24, 1))
+        # Other Filters
+        avail_genders = ["All"] + sorted([g for g in df_sub['gender'].unique() if g != 'All'])
+        avail_ages = ["All"] + sorted([a for a in df_sub['age_group'].unique() if a != 'All Ages'])
+        avail_src = ["Combined"] + sorted(list(df_sub['source_file'].unique()))
         
-        if not df_to_plot.empty:
-            all_hours = range(24)
-            # Prepare list of arrays for boxplot
-            box_data = [df_to_plot[df_to_plot['hour_int'] == h]['glucose_mmol_l'].values for h in all_hours]
-            
-            # Calculate variable widths based on sample count
-            sample_counts = [len(data) for data in box_data]
-            max_count = max(sample_counts) if any(sample_counts) else 1
-            widths = [0.2 + 0.6 * (count / max_count) if max_count > 0 else 0.2 for count in sample_counts]
-            
-            boxes = ax_box.boxplot(box_data, positions=list(all_hours), widths=widths, patch_artist=True, showfliers=False, 
-                                   boxprops=dict(facecolor=plot_color, alpha=0.8), medianprops=dict(color=line_color, linewidth=2))
-            
-            # Add sample count (n) below boxes
-            for hour, count, box in zip(all_hours, sample_counts, boxes['boxes']):
-                if count > 0:
-                    path = box.get_path()
-                    # Safe check for vertices
-                    if path.vertices.size > 0:
-                        box_ymin = np.min(path.vertices[:,1])
-                        ax_box.text(hour, box_ymin - 0.2, str(count), ha='center', va='top', fontsize=8, color='gray')
-            
-            # Add Median Line
-            medians = df_to_plot.groupby('hour_int')['glucose_mmol_l'].median().reindex(all_hours)
-            ax_box.plot(all_hours, medians, 'o-', color=line_color, label=f'Median ({display_mode})', zorder=3, ms=5)
-            ax_box.legend(loc='upper left')
-        else:
-            ax_box.text(11.5, 5, "No data available for this selection.", ha='center', va='center', fontsize=12)
+        sel_gender = f_col2.selectbox("Gender", avail_genders)
+        sel_age = f_col3.selectbox("Age Group", avail_ages)
+        sel_source = f_col4.selectbox("Data Source", avail_src)
         
-        st.pyplot(fig_box)
-        plt.close(fig_box)
-
-        st.markdown("---")
-        st.markdown("### 2. Parameter Estimation")
+        # Apply remaining filters
+        if sel_gender != "All": df_sub = df_sub[df_sub['gender'] == sel_gender]
+        if sel_age != "All": df_sub = df_sub[df_sub['age_group'] == sel_age]
         
-        # --- Parameter Fitting Section ---
-        analysis_options = sorted(list(df_combined['source_file'].unique()))
-        if len(analysis_options) > 1: 
-            analysis_options.append("Combined")
-            
-        source_to_analyze = st.selectbox("Select dataset for modeling:", analysis_options, key="analysis_source")
-
-        if source_to_analyze == "Combined":
-            df_for_fitting = df_combined
-        else:
-            df_for_fitting = df_combined[df_combined['source_file'] == source_to_analyze]
-            
-        results = []
-        unique_genders = sorted(df_for_fitting['gender'].unique())
-        unique_age_groups = df_for_fitting['age_group'].cat.categories
+        df_plot = df_sub if sel_source == "Combined" else df_sub[df_sub['source_file'] == sel_source]
         
-        if unique_genders and not unique_age_groups.empty:
-            # Create grid plot
-            fig_grid, axes = plt.subplots(len(unique_age_groups), len(unique_genders), 
-                                          figsize=(12, 4 * len(unique_age_groups)), 
-                                          sharey=True, sharex=True, squeeze=False)
+        # --- 2. VISUALIZATION ---
+        st.subheader("2. Visualization")
+        
+        if not df_plot.empty:
+            fig_box, ax_box = plt.subplots(figsize=(12, 5))
+            colors = {'File 1': 'cornflowerblue', 'File 2': 'orange', 'Combined': 'mediumseagreen'}
+            curr_color = colors.get(sel_source, 'gray')
             
-            fig_grid.suptitle(f"Daily Profiles & Models for '{source_to_analyze}' (Values in mmol/L)", fontsize=16)
-
-            for i, age_group in enumerate(unique_age_groups):
-                for j, gender in enumerate(unique_genders):
-                    ax = axes[i, j]
-                    ax.set_title(f"{gender}, {age_group}", fontsize=10)
-                    
-                    # Labels only on outer edges
-                    if i == len(unique_age_groups) - 1: 
-                        ax.set_xlabel("Time of Day (h)")
-                    if j == 0: 
-                        ax.set_ylabel("Glucose (mmol/L)")
+            hours = np.arange(24)
+            data_by_hour = [df_plot[df_plot['hour_int'] == h]['value'].values for h in hours]
+            
+            # Boxplot
+            bp = ax_box.boxplot(data_by_hour, positions=hours, patch_artist=True, 
+                                boxprops=dict(facecolor=curr_color, alpha=0.6),
+                                medianprops=dict(color='black'))
+            
+            # Count labels
+            for h, data in enumerate(data_by_hour):
+                if len(data) > 0:
+                    ax_box.text(h, min(data)*0.95, f"n={len(data)}", ha='center', fontsize=7, color='#555')
+            
+            # Median Line
+            medians = df_plot.groupby('hour_int')['value'].median().reindex(hours)
+            ax_box.plot(hours, medians, 'o-', color='darkblue', lw=1.5, label='Median')
+            
+            ax_box.set_xlim(-0.5, 23.5)
+            ax_box.set_xlabel("Time (h)")
+            ax_box.set_ylabel(f"{sel_analyte} ({current_unit})")
+            ax_box.set_title(f"Distribution: {sel_analyte} - {sel_source}")
+            st.pyplot(fig_box)
+            plt.close(fig_box)
+            
+            # --- 3. MODELING ---
+            st.subheader("3. Model Parameters")
+            
+            # Grid Plot of Subgroups (if any)
+            groups = df_sub.groupby(['gender', 'age_group'])
+            if len(groups) > 0:
+                res_list = []
+                st.markdown(f"**Fitted Curves by Subgroup ({sel_source if sel_source != 'Combined' else 'All Data'})**")
+                
+                # Check how many plots we need
+                n_groups = len(groups)
+                cols = 3
+                rows = (n_groups // cols) + 1
+                
+                fig_grid, axes = plt.subplots(rows, cols, figsize=(12, 3*rows), sharex=True)
+                axes = axes.flatten()
+                
+                for i, ((g, a), sub_data) in enumerate(groups):
+                    if sel_source != "Combined":
+                         sub_data = sub_data[sub_data['source_file'] == sel_source]
+                         
+                    ax = axes[i]
+                    if not sub_data.empty:
+                        # Plot Data points
+                        medians = sub_data.groupby('hour_int')['value'].median()
+                        ax.plot(medians.index, medians.values, '.', color='gray', alpha=0.5)
                         
-                    sub_df = df_for_fitting[(df_for_fitting['gender'] == gender) & (df_for_fitting['age_group'] == age_group)]
+                        # Fit
+                        M_fit, A_fit, t0_fit = get_fitted_parameters(sub_data)
+                        if not np.isnan(M_fit):
+                            t_f = np.linspace(0, 24, 100)
+                            y_f = circadian(t_f, M_fit, A_fit, t0_fit)
+                            ax.plot(t_f, y_f, 'r-', label='Fit')
+                            res_list.append({'Group': f"{g} | {a}", 'M': M_fit, 'A': A_fit, 't0': t0_fit%24})
+                        
+                        ax.set_title(f"{g}\n{a}", fontsize=9)
+                        ax.grid(True, alpha=0.3)
+                    else:
+                        ax.text(0.5, 0.5, "No Data", ha='center')
+                        
+                for k in range(i+1, len(axes)): axes[k].axis('off') # Hide empty plots
+                plt.tight_layout()
+                st.pyplot(fig_grid)
+                plt.close(fig_grid)
+                
+                if res_list:
+                    st.dataframe(pd.DataFrame(res_list).set_index('Group').style.format("{:.2f}"))
                     
-                    if not sub_df.empty:
-                        medians = sub_df.groupby('hour_int')['glucose_mmol_l'].median()
-                        if not medians.empty:
-                            ax.plot(medians.index, medians.values, 'o-', ms=3, color='blue', alpha=0.6, label='Median')
-                            
-                            # Fit Model
-                            M_fit, A_fit, t0_fit = get_fitted_parameters(sub_df)
-                            
-                            results.append({
-                                "Gender": gender, 
-                                "Age Group": age_group, 
-                                "Mesor (M)": M_fit, 
-                                "Amplitude (A)": A_fit, 
-                                "Acrophase (t0)": t0_fit % 24 if not np.isnan(t0_fit) else np.nan
-                            })
-                            
-                            if not np.isnan(M_fit):
-                                t_fit = np.linspace(0, 24, 100)
-                                y_fit = circadian(t_fit, M_fit, A_fit, t0_fit)
-                                ax.plot(t_fit, y_fit, '--', color='red', lw=2, label='Model')
-                    
-                    ax.legend(fontsize='x-small')
-                    ax.set_xlim(0, 24)
-
-            fig_grid.tight_layout(rect=[0, 0.03, 1, 0.95])
-            st.pyplot(fig_grid)
-            plt.close(fig_grid)
+        else:
+            st.warning("No data found for the selected filters.")
             
-            st.markdown("#### Estimated Parameters (in mmol/L)")
-            if results:
-                res_df = pd.DataFrame(results).dropna()
-                if not res_df.empty:
-                    st.dataframe(res_df.round(2), use_container_width=True)
-                else:
-                    st.warning("Not enough data to fit models for the subgroups.")
     else:
-        st.info("Please upload at least one CSV file to start the analysis. Expected columns: Age, Gender, Analyse_date, Value.")
+        st.info("Please upload a CSV file (use template above).")
