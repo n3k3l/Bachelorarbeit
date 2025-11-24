@@ -11,19 +11,48 @@ import io
 # ───────────────────────────────────────────
 st.set_page_config(layout="wide", page_title="Diurnal Fluctuations Analysis")
 
-# CSS for Grayish Background
-st.markdown("""
+# DEFINITIONEN FÜR FARBEN
+BG_COLOR = "#f0f2f6"
+TEXT_COLOR = "#000000"
+
+# CSS FÜR STYLING (Hintergrund grau, Schrift schwarz erzwingen)
+st.markdown(f"""
     <style>
-    .stApp {
-        background-color: #f0f2f6;
-    }
-    .block-container {
-        padding-top: 2rem;
-    }
+    /* Haupt-Hintergrund */
+    .stApp {{
+        background-color: {BG_COLOR};
+    }}
+    
+    /* Erzwinge dunkle Schriftfarbe für alle Standard-Elemente */
+    h1, h2, h3, h4, h5, h6, p, span, div {{
+        color: {TEXT_COLOR} !important;
+    }}
+    
+    /* Speziell für Labels über den Widgets (z.B. "Analyte", "Gender") */
+    .stSelectbox label, .stNumberInput label, .stSlider label, .stTimeInput label, .stRadio label, .stFileUploader label {{
+        color: {TEXT_COLOR} !important;
+        font-weight: 600;
+    }}
+    
+    /* Radio Buttons Text */
+    .stRadio div[role='radiogroup'] label div {{
+        color: {TEXT_COLOR} !important;
+    }}
+    
+    /* Tabs Styling anpassen */
+    button[data-baseweb="tab"] {{
+        color: {TEXT_COLOR} !important;
+    }}
+    
+    /* Info-Boxen etwas abdunkeln, damit weißer Text lesbar bleibt, falls Streamlit das so will,
+       oder den Text darin dunkel machen */
+    .stAlert {{
+        color: {TEXT_COLOR};
+    }}
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown("<h2 style='text-align:center; margin-bottom: 25px;'>Visualization & Analysis of Diurnal Fluctuations</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align:center; margin-bottom: 25px; color: black;'>Visualization & Analysis of Diurnal Fluctuations</h2>", unsafe_allow_html=True)
 
 # ───────────────────────────────────────────
 # 1) CONSTANTS & DEFAULTS
@@ -60,7 +89,6 @@ def chronomap_delta(A, M, t0, steps=100):
     return T1, T2, np.abs(Y1 - Y2)
 
 def generate_template_csv():
-    # Matches the screenshot structure provided
     data = {
         'ANALYT': ['Cholesterin', 'Glucose', 'Cortisol'],
         'VALUE': [167, 95, 14.5],
@@ -71,6 +99,20 @@ def generate_template_csv():
     }
     df = pd.DataFrame(data)
     return df.to_csv(index=False).encode('utf-8')
+
+# Helper um Plots an den grauen Hintergrund anzupassen
+def style_plot(fig, ax):
+    fig.patch.set_facecolor(BG_COLOR)
+    ax.set_facecolor(BG_COLOR) # Oder 'white' lassen, wenn man den Kontrast im Plot will
+    # Axenbeschriftung schwarz machen
+    ax.xaxis.label.set_color('black')
+    ax.yaxis.label.set_color('black')
+    ax.tick_params(axis='x', colors='black')
+    ax.tick_params(axis='y', colors='black')
+    ax.title.set_color('black')
+    # Ränder anpassen
+    for spine in ax.spines.values():
+        spine.set_edgecolor('black')
 
 # ───────────────────────────────────────────
 # 3) STREAMLIT TABS
@@ -129,8 +171,11 @@ with tab1:
         # --- Plot 1: Time Series ---
         # Request: t1 black solid
         fig_sin, ax_sin = plt.subplots(figsize=(10, 3.5))
-        ax_sin.set_title(f"Simulated Diurnal Fluctuation for {analyte}", fontsize=12)
-        ax_sin.plot(t_arr, y_arr_display, color="cornflowerblue", label="Expected Profile", lw=2)
+        style_plot(fig_sin, ax_sin) # Apply BG style
+        ax_sin.set_facecolor("white") # Keep graph area white for contrast vs blue line
+        
+        ax_sin.set_title(f"Simulated Diurnal Fluctuation for {analyte}", fontsize=12, color='black')
+        ax_sin.plot(t_arr, y_arr_display, color="cornflowerblue", label="Expected Profile", lw=3)
         
         # t1 Line (Black Solid)
         ax_sin.axvline(t1_hour, color="black", ls="-", lw=2, label=f"t₁ = {format_time_string(t1_hour)}")
@@ -139,10 +184,11 @@ with tab1:
         
         if personalize_mode:
             y_t1_display = circadian(t1_hour, M, A, t0) / (GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else 1.0)
-            ax_sin.plot(t1_hour, y_t1_display, 'ko', markersize=6) # black dot
+            ax_sin.plot(t1_hour, y_t1_display, 'ko', markersize=7, zorder=5) # black dot
         
         ax_sin.set_xlabel("Time of Day (h)"); ax_sin.set_ylabel(f"Concentration ({unit})")
-        ax_sin.grid(True, alpha=0.3); ax_sin.set_xlim(0, 24)
+        ax_sin.grid(True, alpha=0.3)
+        ax_sin.set_xlim(0, 24)
         ax_sin.legend(fontsize='small', loc='upper right')
         st.pyplot(fig_sin)
         
@@ -162,6 +208,8 @@ with tab1:
             
             # Adjusted figsize for alignment
             fig_cm, ax_cm = plt.subplots(figsize=(5, 5))
+            style_plot(fig_cm, ax_cm)
+            
             pcm = ax_cm.pcolormesh(T2, T1, delta_values, cmap="coolwarm", shading='gouraud')
             
             # Contour
@@ -173,11 +221,11 @@ with tab1:
             ax_cm.axvline(t2_hour, color='orange', ls='--', lw=2, label=f"t₂")
             
             # Intersection dot
-            ax_cm.plot(t2_hour, t1_hour, 'ko', markersize=8, mfc='white')
+            ax_cm.plot(t2_hour, t1_hour, 'ko', markersize=8, mfc='white', markeredgewidth=2)
             
             ax_cm.set_xlabel("Timepoint t₂ (h)"); ax_cm.set_ylabel("Timepoint t₁ (h)")
             ax_cm.set_xlim(0, 24); ax_cm.set_ylim(0, 24); ax_cm.set_aspect('equal')
-            # Legend below or inside to save space
+            # Legend
             ax_cm.legend(fontsize='x-small', loc='lower right', framealpha=0.8)
             st.pyplot(fig_cm)
             
@@ -200,10 +248,16 @@ with tab1:
             
             # Plot
             fig_clk, ax_clk = plt.subplots(subplot_kw={'projection':'polar'}, figsize=(5, 5))
+            # Background style for polar is a bit different
+            fig_clk.patch.set_facecolor(BG_COLOR)
+            ax_clk.set_facecolor(BG_COLOR)
+            ax_clk.spines['polar'].set_edgecolor('black')
+            ax_clk.tick_params(axis='x', colors='black')
+            
             ax_clk.set_theta_offset(np.pi/2); ax_clk.set_theta_direction(-1)
             ax_clk.set_xticks(np.linspace(0, 2*np.pi, 12, endpoint=False))
-            ax_clk.set_xticklabels([f"{h*2}" for h in range(12)], fontsize=8)
-            ax_clk.set_yticklabels([]); ax_clk.grid(alpha=0.3); ax_clk.set_rlim(0, 1.1)
+            ax_clk.set_xticklabels([f"{h*2}" for h in range(12)], fontsize=9, color='black')
+            ax_clk.set_yticklabels([]); ax_clk.grid(alpha=0.4, color='gray'); ax_clk.set_rlim(0, 1.1)
             
             y_t1_disp = y_t1 / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else y_t1
             y_t2_disp = y_t2 / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else y_t2
@@ -213,7 +267,7 @@ with tab1:
             # t2 (Orange Dashed)
             ax_clk.plot([theta2, theta2], [0, r2], color='orange', lw=2.5, ls='--', label=f"t₂ ({y_t2_disp:.1f})")
             
-            ax_clk.legend(loc="lower center", bbox_to_anchor=(0.5, -0.2), ncol=2, fontsize='small')
+            ax_clk.legend(loc="lower center", bbox_to_anchor=(0.5, -0.2), ncol=2, fontsize='small', facecolor=BG_COLOR, edgecolor='gray')
             st.pyplot(fig_clk)
 
 # ==========================================
@@ -250,10 +304,6 @@ with tab2:
             # Strip whitespace from headers
             df.columns = df.columns.str.strip().str.upper()
             
-            # Required Columns Mapping
-            # Expected: ANALYT, VALUE, DIM, TIME (Required)
-            # Optional: SEX, AGE
-            
             if not {'VALUE', 'TIME'}.issubset(df.columns):
                 st.error(f"File {name} is missing required columns: VALUE, TIME")
                 return None
@@ -262,32 +312,28 @@ with tab2:
             if 'ANALYT' not in df.columns:
                 df['ANALYT'] = 'Unknown'
             
-            # 2. DIM Handling (optional, mostly for display)
+            # 2. DIM Handling
             if 'DIM' not in df.columns:
                 df['DIM'] = ''
 
-            # 3. SEX Handling (Optional)
+            # 3. SEX Handling
             if 'SEX' not in df.columns:
-                df['SEX'] = 'All' # Group everyone if missing
+                df['SEX'] = 'All' 
             else:
-                # Standardize
                 df['SEX'] = df['SEX'].astype(str).str.upper().map({
                     'M': 'Male', 'F': 'Female', 'D': 'Divers', 'MALE': 'Male', 'FEMALE': 'Female'
                 }).fillna('Other')
             
-            # 4. AGE Handling (Optional)
+            # 4. AGE Handling
             if 'AGE' not in df.columns:
                 df['AGE_GROUP'] = 'All'
             else:
                 df['AGE'] = pd.to_numeric(df['AGE'], errors='coerce')
-                # Create bins
                 df['AGE_GROUP'] = pd.cut(df['AGE'], bins=[0, 30, 50, 120], labels=["< 30", "30-50", "> 50"], right=False)
                 df['AGE_GROUP'] = df['AGE_GROUP'].cat.add_categories("Unknown").fillna("Unknown")
 
-            # 5. TIME Processing (DD.MM.YYYY HH:MM)
-            # Try specific format first, then fall back
+            # 5. TIME Processing
             df['TIMESTAMP'] = pd.to_datetime(df['TIME'], format='%d.%m.%Y %H:%M', errors='coerce')
-            # If format failed, try generic
             mask_nat = df['TIMESTAMP'].isna()
             if mask_nat.any():
                 df.loc[mask_nat, 'TIMESTAMP'] = pd.to_datetime(df.loc[mask_nat, 'TIME'], errors='coerce')
@@ -312,15 +358,13 @@ with tab2:
         # --- FILTERS ---
         st.markdown("#### Data Filters")
         
-        # 1. Analyte Filter (Crucial new requirement)
+        # 1. Analyte Filter
         analytes = sorted(df_all['ANALYT'].unique())
         sel_analyt = st.selectbox("Select Analyte", analytes)
         df_sub = df_all[df_all['ANALYT'] == sel_analyt].copy()
         
         # 2. Grouping Filters
         c_f1, c_f2 = st.columns(2)
-        
-        # Handle cases where SEX or AGE might be 'All' only
         sex_opts = ["All"] + sorted([x for x in df_sub['SEX'].unique() if x != "All"])
         age_opts = ["All"] + sorted([str(x) for x in df_sub['AGE_GROUP'].unique() if str(x) != "All"])
         
@@ -336,21 +380,17 @@ with tab2:
         if df_sub.empty:
             st.warning("No data matches filters.")
         else:
-            # Determine Unit
             unit_display = df_sub['DIM'].iloc[0] if 'DIM' in df_sub.columns else ""
             
             st.markdown(f"**Data Overview** ({len(df_sub)} samples) - Unit: {unit_display}")
             
             # --- BOXPLOT ---
             fig_box, ax_box = plt.subplots(figsize=(12, 5))
+            style_plot(fig_box, ax_box)
+            ax_box.set_facecolor("white") # Boxplot looks better on white
             
-            # Color logic
             colors = {'File 1': 'cornflowerblue', 'File 2': 'sandybrown'}
-            
-            # Prepare data for boxplot (Hour bins)
             df_sub['HOUR_INT'] = df_sub['TIMESTAMP'].dt.hour
-            
-            # We plot distinct sources if available
             sources = df_sub['SOURCE'].unique()
             
             for src in sources:
@@ -358,28 +398,25 @@ with tab2:
                 hrs = np.arange(24)
                 vals = [dat[dat['HOUR_INT'] == h]['VALUE'].values for h in hrs]
                 
-                # Check if data exists for plotting
                 if any(len(v) > 0 for v in vals):
                     bp = ax_box.boxplot(vals, positions=hrs, widths=0.6, patch_artist=True, 
                                         boxprops=dict(facecolor=colors.get(src, 'gray'), alpha=0.6))
-                    # Median line
                     medians = [np.median(v) if len(v) > 0 else np.nan for v in vals]
                     ax_box.plot(hrs, medians, color=colors.get(src, 'gray'), lw=2, label=src)
             
             ax_box.set_xlabel("Time of Day (h)")
             ax_box.set_ylabel(f"Value {unit_display}")
             ax_box.set_xticks(range(0, 24, 2))
-            ax_box.legend()
+            ax_box.legend(facecolor='white', edgecolor='black')
             ax_box.grid(True, axis='y', alpha=0.3)
             
             st.pyplot(fig_box)
             
-            # --- MODEL FITTING (Optional) ---
+            # --- MODEL FITTING ---
             st.markdown("#### Circadian Fit")
             
             def get_fit(dframe):
                 if len(dframe) < 10: return None
-                # Group by hour to get generic shape
                 grp = dframe.groupby('HOUR_INT')['VALUE'].median()
                 x_data, y_data = grp.index.values, grp.values
                 if len(x_data) < 4: return None
@@ -404,13 +441,14 @@ with tab2:
                         M_fit, A_fit, t0_fit = params
                         st.write(f"**M:** {M_fit:.1f} | **A:** {A_fit:.1f} | **t₀:** {t0_fit % 24:.1f}h")
                         
-                        # Small plot
                         fig_fit, ax_fit = plt.subplots(figsize=(4, 3))
-                        ax_fit.scatter(d_src['HOUR'], d_src['VALUE'], alpha=0.3, s=10, color='gray')
+                        style_plot(fig_fit, ax_fit)
+                        ax_fit.set_facecolor("white")
                         
+                        ax_fit.scatter(d_src['HOUR'], d_src['VALUE'], alpha=0.3, s=10, color='gray')
                         t_lin = np.linspace(0, 24, 100)
                         ax_fit.plot(t_lin, circadian(t_lin, *params), color='red', lw=2)
-                        ax_fit.set_title(f"{sel_analyt} ({src})")
+                        ax_fit.set_title(f"{sel_analyt} ({src})", color='black')
                         st.pyplot(fig_fit)
                     else:
                         st.write("Not enough data for curve fitting.")
