@@ -12,7 +12,7 @@ import io
 st.set_page_config(layout="wide", page_title="Diurnal Fluctuations Analysis")
 
 # ───────────────────────────────────────────
-# CSS STYLING (Fixed)
+# CSS STYLING (Complete)
 # ───────────────────────────────────────────
 BG_COLOR = "#f0f2f6"     # Hellgrau (Hintergrund)
 TEXT_MAIN = "#000000"    # Schwarz (Labels, Überschriften)
@@ -23,15 +23,15 @@ st.markdown(f"""
     /* 1. Hintergrund der gesamten App */
     .stApp {{
         background-color: {BG_COLOR};
-        color: {TEXT_MAIN}; /* Standard Textfarbe schwarz */
+        color: {TEXT_MAIN};
     }}
     
-    /* 2. Überschriften und Labels erzwingen wir auf SCHWARZ */
+    /* 2. Standard-Text (Überschriften, Labels) -> SCHWARZ */
     h1, h2, h3, h4, h5, h6, p, li, label {{
         color: {TEXT_MAIN} !important;
     }}
     
-    /* Labels über den Inputs spezifisch ansprechen */
+    /* Labels über den Inputs */
     .stSelectbox label, .stNumberInput label, .stSlider label, 
     .stTimeInput label, .stRadio label, .stFileUploader label, 
     .stCheckbox label {{
@@ -43,72 +43,75 @@ st.markdown(f"""
     /* 3. WIDGET INHALTE (Dunkle Boxen -> WEISSE Schrift)      */
     /* ------------------------------------------------------- */
 
-    /* SELECTBOX & TIME INPUT (Das Innere der Box) */
-    /* Wir zielen auf das Element mit data-baseweb="select" und alle Kinder */
+    /* A) Das GESCHLOSSENE Dropdown & TimeInput Feld */
     div[data-baseweb="select"] > div {{
         color: {TEXT_WIDGET} !important;
     }}
-    /* Auch den Text (span/div) darin weiß machen */
     div[data-baseweb="select"] span {{
         color: {TEXT_WIDGET} !important;
     }}
-    div[data-baseweb="select"] div {{
-        color: {TEXT_WIDGET} !important;
-    }}
-    /* Die Pfeile (SVG) weiß machen */
+    /* Die Pfeil-Icons */
     div[data-baseweb="select"] svg {{
         fill: {TEXT_WIDGET} !important;
     }}
 
-    /* ZAHLEN INPUT (Number Input) */
+    /* B) Das AUFGEKLAPPTE Dropdown-Menü (Popover Liste) */
+    /* Dies ist der kritische Teil für den Screenshot */
+    ul[data-baseweb="menu"] li {{
+        color: {TEXT_WIDGET} !important;
+    }}
+    /* Text innerhalb der Listen-Elemente */
+    ul[data-baseweb="menu"] li div {{
+        color: {TEXT_WIDGET} !important;
+    }}
+    /* Der Container der Liste selbst */
+    ul[data-baseweb="menu"] {{
+        background-color: #262730; /* Dunkler Hintergrund sicherstellen */
+    }}
+
+    /* C) ZAHLEN INPUT */
     .stNumberInput input {{
         color: {TEXT_WIDGET} !important;
     }}
-    /* Die Plus/Minus Buttons daneben */
     .stNumberInput button {{
         color: {TEXT_WIDGET} !important;
     }}
 
-    /* BUTTONS (Download & Browse Files) */
+    /* D) BUTTONS (Download & Browse) */
     button {{
         color: {TEXT_WIDGET} !important;
     }}
-    /* Speziell für Download Button Text Container */
     .stDownloadButton button p {{
         color: {TEXT_WIDGET} !important;
     }}
 
-    /* FILE UPLOADER (Drag & Drop Zone Text) */
-    [data-testid="stFileUploader"] section div {{
-        color: {TEXT_WIDGET} !important;
-    }}
+    /* E) FILE UPLOADER */
+    [data-testid="stFileUploader"] section div,
     [data-testid="stFileUploader"] section span {{
         color: {TEXT_WIDGET} !important;
     }}
-    /* Das "Limit 200MB" Kleingedruckte etwas heller grau */
     [data-testid="stFileUploader"] small {{
         color: #cccccc !important;
     }}
 
     /* ------------------------------------------------------- */
-    /* 4. AUSNAHMEN WIEDERHERSTELLEN                           */
+    /* 4. AUSNAHMEN (Elemente, die schwarz bleiben müssen)     */
     /* ------------------------------------------------------- */
 
-    /* Radio Buttons Optionen Text (muss schwarz sein auf grauem Grund) */
+    /* Radio Buttons Optionen (schwarz auf grauem Hintergrund) */
     .stRadio div[role='radiogroup'] label div {{
         color: {TEXT_MAIN} !important;
     }}
 
-    /* Tabs Text (inaktiv schwarz) */
+    /* Tabs Text */
     button[data-baseweb="tab"] {{
         color: {TEXT_MAIN} !important;
     }}
-    /* Tabs Text (aktiv rot/hervorgehoben) */
     button[data-baseweb="tab"][aria-selected="true"] {{
         color: #d10000 !important;
     }}
 
-    /* Expander/Alert Texte */
+    /* Warnungen/Alerts */
     .stAlert div {{
         color: inherit; 
     }}
