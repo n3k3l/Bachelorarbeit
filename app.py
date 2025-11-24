@@ -24,12 +24,12 @@ st.markdown(f"""
         background-color: {BG_COLOR};
     }}
     
-    /* 2. Genereller Text auf der Seite (Überschriften, Paragraphen, Beschriftungen) -> SCHWARZ */
-    h1, h2, h3, h4, h5, h6, p, li, span {{
-        color: {TEXT_COLOR} !important;
+    /* 2. Genereller Text auf der Seite (Überschriften, Labels) -> SCHWARZ */
+    h1, h2, h3, h4, h5, h6, p, li, span, div {{
+        color: {TEXT_COLOR};
     }}
     
-    /* Labels ÜBER den Inputs (z.B. "Analyte", "Upload File") -> SCHWARZ */
+    /* Labels ÜBER den Inputs (z.B. "Analyte", "Upload File") -> SCHWARZ & FETT */
     .stSelectbox label, .stNumberInput label, .stSlider label, 
     .stTimeInput label, .stRadio label, .stFileUploader label, 
     .stCheckbox label {{
@@ -37,45 +37,56 @@ st.markdown(f"""
         font-weight: 600;
     }}
 
-    /* 3. Text INNERHALB von dunklen Widgets (Buttons, Inputs, Uploader) -> WEISS */
+    /* 3. WIDGETS ANPASSEN (Dunkler Hintergrund -> Weißer Text) */
     
-    /* Buttons (Download, Browse files) */
-    button {{
+    /* DOWNLOAD BUTTON & Normale Buttons */
+    .stDownloadButton button, .stButton button {{
         color: {WIDGET_TEXT} !important;
     }}
     
-    /* File Uploader Dropzone Text ("Drag and drop file here") */
-    [data-testid="stFileUploader"] section div {{
+    /* FILE UPLOADER (Drag & Drop Zone) */
+    /* Zwingt allen Text innerhalb der Dropzone auf Weiß */
+    [data-testid="stFileUploader"] section, 
+    [data-testid="stFileUploader"] div, 
+    [data-testid="stFileUploader"] span {{
         color: {WIDGET_TEXT} !important;
     }}
-    /* Die kleine Schrift im Uploader ("Limit 200MB...") */
-    [data-testid="stFileUploader"] section small {{
-        color: #cccccc !important;
+    
+    /* Das "Limit 200MB" Kleingedruckte etwas grauer, aber lesbar */
+    [data-testid="stFileUploader"] small {{
+        color: #e0e0e0 !important;
     }}
 
-    /* Selectboxen & Eingabefelder (der ausgewählte Wert) */
-    .stSelectbox div[data-baseweb="select"] span {{
+    /* Der "Browse files" Button innerhalb des Uploaders */
+    [data-testid="stFileUploader"] button {{
         color: {WIDGET_TEXT} !important;
     }}
+
+    /* INPUT FELDER (Zahlen, Zeit) - Text innen weiß, falls Box dunkel ist */
     .stNumberInput input, .stTimeInput input {{
         color: {WIDGET_TEXT} !important;
     }}
     
-    /* Radio Buttons Optionen */
+    /* SELECTBOX Text des ausgewählten Elements */
+    .stSelectbox div[data-baseweb="select"] span {{
+        color: {WIDGET_TEXT} !important;
+    }}
+    
+    /* RADIO BUTTONS Text */
     .stRadio div[role='radiogroup'] label div {{
         color: {TEXT_COLOR} !important;
     }}
 
-    /* Tabs Styling */
+    /* TABS Styling */
     button[data-baseweb="tab"] {{
-        color: {TEXT_COLOR} !important; /* Inaktive Tabs schwarz */
+        color: {TEXT_COLOR} !important;
     }}
     button[data-baseweb="tab"][aria-selected="true"] {{
-        color: #d10000 !important; /* Aktiver Tab rötlich hervorheben */
+        color: #d10000 !important; /* Aktiver Tab rot */
     }}
 
-    /* Expander/Alerts lesbar machen */
-    .stAlert {{
+    /* Warnungen/Infos lesbar machen (Hintergrund ist meist hell in st.info) */
+    .stAlert div {{
         color: {TEXT_COLOR} !important;
     }}
     </style>
