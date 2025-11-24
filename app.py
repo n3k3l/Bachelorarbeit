@@ -114,64 +114,100 @@ def generate_template_csv():
 @st.cache_data
 def load_and_process_data(_file, file_identifier):
     """
-    Universal-Loader: Liest Excel (.xlsx) und CSV (Komma oder Semikolon).
-    Bereinigt Spaltennamen von unsichtbaren Zeichen (BOM).
+    Extrem robuster Loader:
+    1. Sucht die Header-Zeile (falls Metadaten oben stehen).
+    2. Bereinigt Spaltennamen.
+    3. Sucht Synonyme für Spalten.
+    4. Bereinigt Daten.
     """
     try:
         filename = _file.name.lower()
         
-        # 1. EXCEL ODER CSV ERKENNUNG
+        # --- SCHRITT 1: HEADER FINDEN ---
+        # Wir lesen erst "roh" ohne Header ein, um zu sehen, wo die Daten beginnen.
         if filename.endswith('.xlsx') or filename.endswith('.xls'):
-            df = pd.read_excel(_file)
+            df_raw = pd.read_excel(_file, header=None, nrows=20)
         else:
-            # Versuch 1: Standard CSV (engine python erkennt vieles automatisch)
-            # encoding='utf-8-sig' entfernt automatisch BOM (\ufeff)
+            # CSV: Probiere verschiedene Encodings
             try:
-                df = pd.read_csv(_file, sep=None, engine='python', encoding='utf-8-sig')
+                df_raw = pd.read_csv(_file, sep=None, engine='python', header=None, nrows=20, encoding='utf-8-sig')
             except:
-                # Fallback: Windows Encoding
                 _file.seek(0)
-                df = pd.read_csv(_file, sep=None, engine='python', encoding='latin1')
+                df_raw = pd.read_csv(_file, sep=None, engine='python', header=None, nrows=20, encoding='latin1')
 
-        # 2. SPALTENNAMEN BEREINIGEN (Kritisch!)
-        # Entfernt Leerzeichen, BOM, Anführungszeichen und macht alles uppercase
-        df.columns = df.columns.astype(str).str.strip().str.replace('"', '').str.replace("'", "").str.upper()
+        # Wir suchen eine Zeile, die Keywords wie "VALUE" oder "ANALYT" enthält
+        header_row_idx = 0
+        found_header = False
         
-        # Check: Wenn nur 1 Spalte erkannt wurde, ist das Trennzeichen falsch
-        if len(df.columns) == 1 and filename.endswith('.csv'):
-            _file.seek(0)
-            df = pd.read_csv(_file, sep=';', engine='python')
-            df.columns = df.columns.astype(str).str.strip().str.replace('"', '').str.replace("'", "").str.upper()
+        # Keywords, die auf eine Header-Zeile hindeuten (in Uppercase)
+        header_keywords = ['VALUE', 'WERT', 'MESSWERT', 'RESULT', 'ANALYT', 'PARAMETER', 'TIME', 'DATUM']
+        
+        for idx, row in df_raw.iterrows():
+            # Zeile zu String, Uppercase
+            row_str = " ".join(row.astype(str)).upper()
+            # Zählen wie viele Keywords in dieser Zeile vorkommen
+            matches = sum(1 for kw in header_keywords if kw in row_str)
+            if matches >= 2: # Wenn mindestens 2 Keywords gefunden wurden (z.B. ANALYT und WERT)
+                header_row_idx = idx
+                found_header = True
+                break
+        
+        # --- SCHRITT 2: ECHTES EINLESEN ---
+        _file.seek(0) # Zurück zum Anfang
+        if filename.endswith('.xlsx') or filename.endswith('.xls'):
+            df = pd.read_excel(_file, header=header_row_idx)
+        else:
+            try:
+                df = pd.read_csv(_file, sep=None, engine='python', header=header_row_idx, encoding='utf-8-sig')
+            except:
+                _file.seek(0)
+                df = pd.read_csv(_file, sep=None, engine='python', header=header_row_idx, encoding='latin1')
 
-        # 3. MAPPING (Synonym-Suche)
+        # --- SCHRITT 3: SPALTEN BEREINIGUNG ---
+        # Alles Uppercase, Leerzeichen weg, Sonderzeichen weg
+        df.columns = df.columns.astype(str).str.strip().str.replace('"', '').str.replace("'", "").str.upper()
+
+        # Mapping Definieren
         column_candidates = {
             'value':     ['VALUE', 'WERT', 'ERGEBNIS', 'RESULT', 'MESSWERT', 'CONCENTRATION'],
-            'timestamp': ['TIME', 'ZEIT', 'DATE', 'DATUM', 'ANALYSE_DATE', 'TIMESTAMP'],
+            'timestamp': ['TIME', 'ZEIT', 'DATE', 'DATUM', 'ANALYSE_DATE', 'TIMESTAMP', 'PROBENNAHME'],
             'gender':    ['SEX', 'GENDER', 'GESCHLECHT'],
-            'age':       ['AGE', 'ALTER', 'JAHRE'],
-            'analyte':   ['ANALYT', 'ANALYTE', 'PARAMETER', 'STOFF', 'TEST'],
-            'unit':      ['DIM', 'UNIT', 'EINHEIT', 'DIMENSION']
+            'age':       ['AGE', 'ALTER', 'JAHRE', 'GEBURTSDATUM'], # Geburtsdatum müsste man noch parsen, hier vereinfacht
+            'analyte':   ['ANALYT', 'ANALYTE', 'PARAMETER', 'STOFF', 'TEST', 'BEZEICHNUNG'],
+            'unit':      ['DIM', 'UNIT', 'EINHEIT', 'DIMENSION', 'MASSEINHEIT']
         }
         
         found_mapping = {}
         existing_cols = list(df.columns)
         
+        # A) Exakte Synonym-Suche
         for target, candidates in column_candidates.items():
             for candidate in candidates:
                 if candidate in existing_cols:
                     found_mapping[candidate] = target
                     break 
         
+        # B) Unscharfe Suche (Fuzzy): Falls exakt nicht gefunden, suche "enthält"
+        # Z.B. Spalte heißt "Analyt (Blut)" -> enthält "ANALYT"
+        for target, candidates in column_candidates.items():
+            if target not in found_mapping.values(): # Nur suchen wenn noch nicht gefunden
+                for col in existing_cols:
+                    for candidate in candidates:
+                        if candidate in col and col not in found_mapping:
+                            found_mapping[col] = target
+                            break
+                    if target in found_mapping.values(): break
+
         df.rename(columns=found_mapping, inplace=True)
         
-        # 4. PRÜFUNG
+        # Check Critical Columns
         if 'value' not in df.columns or 'timestamp' not in df.columns:
-            st.error(f"Error in '{file_identifier}': Konnte Spalten nicht zuordnen. Gefunden: {existing_cols}")
+            st.error(f"Error in '{file_identifier}': Konnte Spalten 'Value' oder 'Time' nicht finden. Gefunden: {existing_cols}")
             return None
 
-        # --- DATEN AUFBEREITUNG ---
+        # --- SCHRITT 4: DATEN BEREINIGUNG ---
         
-        # Value (Komma -> Punkt)
+        # Value
         if df['value'].dtype == object:
             df['value'] = df['value'].astype(str).str.replace(',', '.', regex=False)
         df['value'] = pd.to_numeric(df['value'], errors='coerce')
@@ -182,11 +218,13 @@ def load_and_process_data(_file, file_identifier):
         df.dropna(subset=['timestamp'], inplace=True)
         df['hour_int'] = df['timestamp'].dt.hour
         
-        # Analyte (Hier lag das Problem beim User -> ANALYT wurde nicht gefunden)
+        # Analyte - Hier werden wir sicherstellen, dass was drin steht
         if 'analyte' in df.columns:
             df['analyte'] = df['analyte'].astype(str).str.strip().str.title()
+            # Falls leere Strings drin sind, ersetzen
+            df['analyte'].replace(['', 'Nan', 'None'], 'Unknown Analyte', inplace=True)
         else:
-            # Falls ANALYT wirklich fehlt, setzen wir einen Default, damit das Script nicht crasht
+            # Fallback: Spalte fehlt -> "Unknown Analyte"
             df['analyte'] = "Unknown Analyte"
 
         # Alter
@@ -218,7 +256,7 @@ def load_and_process_data(_file, file_identifier):
         
         return df
     except Exception as e:
-        st.error(f"Kritischer Fehler bei '{file_identifier}': {e}")
+        st.error(f"Fehler beim Verarbeiten von '{file_identifier}': {e}")
         return None
 
 def get_fitted_parameters(df_group, value_column='value'):
@@ -362,7 +400,6 @@ with tab2:
         st.download_button("📄 Download CSV Template", csv_data, "circadian_template.csv", "text/csv")
         
     df1, df2 = None, None
-    # Support for xlsx and csv
     with col_up1:
         f1 = st.file_uploader("Upload Control Group", type=["csv", "xlsx"], key="file1")
         if f1: df1 = load_and_process_data(f1, "File 1")
@@ -381,13 +418,30 @@ with tab2:
         st.markdown("### 2. Filters & Visualization")
         
         available_analytes = sorted(df_combined['analyte'].unique())
-        default_ix = available_analytes.index("Glucose") if "Glucose" in available_analytes else 0
         
+        # -- Logic to hide Unknown Analyte if real ones exist --
+        if len(available_analytes) > 1 and "Unknown Analyte" in available_analytes:
+             # If we have "Glucose" and "Unknown", default to Glucose
+             default_ix = 0 
+             for i, a in enumerate(available_analytes):
+                 if a != "Unknown Analyte":
+                     default_ix = i
+                     break
+        else:
+             default_ix = 0
+
         f_col1, f_col2, f_col3, f_col4 = st.columns(4)
         analyte_filter = f_col1.selectbox("Analyte", available_analytes, index=default_ix)
         
         df_analyte = df_combined[df_combined['analyte'] == analyte_filter]
-        current_unit = df_analyte['unit'].mode()[0] if not df_analyte['unit'].empty else "units"
+        
+        if not df_analyte.empty:
+            if 'unit' in df_analyte.columns and not df_analyte['unit'].isnull().all():
+                current_unit = df_analyte['unit'].mode()[0]
+            else:
+                current_unit = "units"
+        else:
+            current_unit = "units"
         
         gender_opts = ["All"] + sorted(df_analyte['gender'].unique())
         age_opts = ["All"] + list(df_analyte['age_group'].dropna().unique())
