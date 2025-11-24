@@ -15,21 +15,25 @@ st.set_page_config(layout="wide", page_title="Circadian Analysis")
 # OPTIMIZED CSS
 st.markdown("""
     <style>
-    /* 1. Main Background color */
-    .stApp { background-color: #f0f2f6; }
+    /* 1. Main Background color (Light Professional Gray) */
+    .stApp {
+        background-color: #f0f2f6;
+    }
     
-    /* 2. General Text Color */
+    /* 2. General Text Color (Dark Gray/Black for readability on page) */
     h1, h2, h3, h4, h5, h6, .stMarkdown, p, label, li {
         color: #1f1f1f !important;
         font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
     }
     
-    /* 3. INPUT FIELDS & DROPDOWNS */
+    /* 3. INPUT FIELDS & DROPDOWNS -> DARK BG / WHITE FONT */
     div[data-baseweb="input"] {
         background-color: #4a4a4a !important; 
         border: 1px solid #666 !important;
     }
-    input.st-ai, input.st-ah { color: #ffffff !important; }
+    input.st-ai, input.st-ah {
+        color: #ffffff !important; 
+    }
     
     /* Dropdowns */
     div[data-baseweb="select"] > div {
@@ -37,10 +41,14 @@ st.markdown("""
         color: #ffffff !important;             
         border: 1px solid #666 !important;
     }
-    div[data-baseweb="select"] span { color: #ffffff !important; }
-    div[data-baseweb="select"] svg { fill: #ffffff !important; }
+    div[data-baseweb="select"] span {
+        color: #ffffff !important;
+    }
+    div[data-baseweb="select"] svg {
+        fill: #ffffff !important;
+    }
 
-    /* 4. BUTTONS */
+    /* 4. BUTTONS (Download & Normal) */
     .stDownloadButton > button, .stButton > button {
         color: #ffffff !important;
         background-color: #4a4a4a !important;
@@ -52,7 +60,9 @@ st.markdown("""
     }
     
     /* 5. Tabs styling */
-    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
     .stTabs [data-baseweb="tab"] {
         background-color: #ffffff;
         border-radius: 4px 4px 0px 0px;
@@ -67,10 +77,13 @@ st.markdown("""
     }
     
     /* 6. Slider Text */
-    div[data-testid="stThumbValue"] { color: #1f1f1f !important; }
+    div[data-testid="stThumbValue"] {
+        color: #1f1f1f !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
+# Set global plot style
 sns.set_style("whitegrid")
 plt.rcParams['text.color'] = '#1f1f1f'
 plt.rcParams['axes.labelcolor'] = '#1f1f1f'
@@ -126,89 +139,91 @@ def generate_template_csv():
 
 @st.cache_data
 def load_and_process_data(_file, file_identifier):
-    """
-    Lädt CSV-Dateien extrem robust ein, indem es nach Synonymen für Spalten sucht.
-    """
     try:
+        # 1. Einlesen
         df = pd.read_csv(_file, sep=None, engine='python')
-        # Alle Spaltennamen bereinigen (Trim + Uppercase)
+        
+        # Spaltennamen normalisieren
         df.columns = df.columns.str.strip().str.upper()
         
-        # Mapping-Definition: Ziel-Name -> Liste möglicher CSV-Header
-        # Die Reihenfolge in der Liste ist die Priorität.
-        column_candidates = {
-            'value':     ['VALUE', 'WERT', 'ERGEBNIS', 'RESULT', 'MESSWERT'],
-            'timestamp': ['TIME', 'ZEIT', 'DATE', 'DATUM', 'ANALYSE_DATE', 'TIMESTAMP'],
-            'gender':    ['SEX', 'GENDER', 'GESCHLECHT'],
-            'age':       ['AGE', 'ALTER', 'JAHRE'],
-            'analyte':   ['ANALYT', 'ANALYTE', 'PARAMETER', 'STOFF'],
-            'unit':      ['DIM', 'UNIT', 'EINHEIT']
-        }
+        # Mapping der Screenshot-Spalten
+        COLUMN_MAP = {'ANALYT': 'analyte', 'VALUE': 'value', 'DIM': 'unit', 'TIME': 'timestamp', 'SEX': 'gender', 'AGE': 'age'}
         
-        # Umbennung durchführen
-        found_mapping = {}
-        existing_cols = list(df.columns)
+        required_cols = set(COLUMN_MAP.keys())
+        found_cols = set(df.columns)
         
-        for target, candidates in column_candidates.items():
-            for candidate in candidates:
-                if candidate in existing_cols:
-                    found_mapping[candidate] = target
-                    break # Ersten Treffer nehmen
-        
-        df.rename(columns=found_mapping, inplace=True)
-        
-        # Prüfung: Haben wir die Mindest-Spalten?
-        if 'value' not in df.columns or 'timestamp' not in df.columns:
-            st.error(f"Error in '{file_identifier}': Konnte 'Value' oder 'Time' Spalte nicht finden. Gefundene Spalten: {existing_cols}")
-            return None
+        # ─── NEU: ROBUSTERES MAPPING ───
+        # Wenn nicht ALLE Spalten da sind, versuchen wir intelligente Synonyme zu finden
+        if not required_cols.issubset(found_cols):
+            # Erweitertes Fallback-Mapping (inkl. SEX und GESCHLECHT)
+            fallback_map = {
+                'GENDER': 'gender', 'SEX': 'gender', 'GESCHLECHT': 'gender', 
+                'AGE': 'age', 'ALTER': 'age',
+                'VALUE': 'value', 'WERT': 'value', 'ERGEBNIS': 'value',
+                'ANALYSE_DATE': 'timestamp', 'DATE': 'timestamp', 'ZEIT': 'timestamp', 'TIME': 'timestamp',
+                'ANALYT': 'analyte', 'PARAMETER': 'analyte'
+            }
+            renamed = False
+            for k, v in fallback_map.items():
+                if k in found_cols and v not in df.columns: # Nur umbenennen wenn Ziel noch nicht existiert
+                    df.rename(columns={k: v}, inplace=True)
+                    renamed = True
+            
+            # Mindestanforderung prüfen
+            current_cols = set(df.columns)
+            if not {'value', 'timestamp'}.issubset(current_cols):
+                 st.error(f"Error in '{file_identifier}': Missing crucial columns (Value/Time). Found: {list(current_cols)}")
+                 return None
+        else:
+            df = df.rename(columns=COLUMN_MAP)
 
-        # --- DATEN BEREINIGUNG ---
-        
-        # 1. Werte (Komma -> Punkt)
+        # 2. Werte bereinigen
         if df['value'].dtype == object:
             df['value'] = df['value'].astype(str).str.replace(',', '.', regex=False)
         df['value'] = pd.to_numeric(df['value'], errors='coerce')
+        
+        # 3. Analyt Name
+        if 'analyte' in df.columns:
+            df['analyte'] = df['analyte'].astype(str).str.title()
+        else:
+            df['analyte'] = "Unknown"
+            
+        # 4. Daten filtern
         df.dropna(subset=['value'], inplace=True)
-
-        # 2. Zeitstempel
+        
+        if 'age' in df.columns:
+            df['age'] = pd.to_numeric(df['age'], errors='coerce').fillna(0).astype(int)
+        else:
+            df['age'] = 35 # Default
+            
+        # 5. Zeitstempel
         df['timestamp'] = pd.to_datetime(df['timestamp'], dayfirst=True, errors='coerce')
         df.dropna(subset=['timestamp'], inplace=True)
         df['hour_int'] = df['timestamp'].dt.hour
         
-        # 3. Analyt (Standardisieren)
-        if 'analyte' in df.columns:
-            df['analyte'] = df['analyte'].astype(str).str.strip().str.title()
-        else:
-            df['analyte'] = "Unknown"
-
-        # 4. Alter (Fallback 35)
-        if 'age' in df.columns:
-            df['age'] = pd.to_numeric(df['age'], errors='coerce').fillna(35).astype(int)
-        else:
-            df['age'] = 35
-            
-        # 5. Geschlecht (Robustes Parsing)
+        # 6. GESCHLECHT BEREINIGEN (SEHR ROBUST)
+        # Erkennt "M", "Male", "Mann", "männlich", "Herr" -> "Male"
+        # Erkennt "F", "Female", "Frau", "w", "weiblich" -> "Female"
         if 'gender' in df.columns:
             def clean_gender(x):
                 s = str(x).strip().upper()
                 if not s or s == 'NAN': return 'Other'
-                # Prüfe auf M, Male, Mann, Herr, H
+                # Check Male
                 if s.startswith('M') or s.startswith('H'): return 'Male'
-                # Prüfe auf F, Female, Frau, W, Weiblich
+                # Check Female
                 if s.startswith('F') or s.startswith('W'): return 'Female'
                 return 'Other'
             df['gender'] = df['gender'].apply(clean_gender)
         else:
+            # Wenn keine Spalte gefunden wurde, aber Daten da sind -> Other
             df['gender'] = 'Other'
             
-        # 6. Zusatzinfos
+        # 7. Altersgruppen
         df['age_group'] = pd.cut(df['age'], bins=[0, 30, 50, 120], labels=["< 30 years", "30-50 years", "> 50 years"], right=False)
         df['source_file'] = file_identifier
-        
         return df
     except Exception as e:
-        st.error(f"Kritischer Fehler beim Laden von '{file_identifier}': {e}")
-        return None
+        st.error(f"Error processing '{file_identifier}': {e}"); return None
 
 def get_fitted_parameters(df_group, value_column='value'):
     if len(df_group) < 5: return np.nan, np.nan, np.nan
@@ -266,6 +281,7 @@ with tab1:
         mu_abs = M * MU_perc / 100
 
     with right:
+        # Berechnungen
         t_arr = np.linspace(0, 24, 500)
         y_arr = circadian(t_arr, M, A, t0)
         y_disp = y_arr / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else y_arr
@@ -287,7 +303,7 @@ with tab1:
         
         st.markdown("---")
 
-        # ─── UNTEN: Zwei Spalten ───
+        # ─── UNTEN: Zwei Spalten (Controls + Plots) ───
         row1_c1, row1_c2 = st.columns(2, gap="medium")
         with row1_c1:
             st.markdown("##### Chronomap")
@@ -329,7 +345,7 @@ with tab1:
             st.pyplot(fig_cm, use_container_width=True)
             plt.close(fig_cm)
             
-        # --- RECHTER PLOT (Uhr - Breites Format) ---
+        # --- RECHTER PLOT (Uhr) ---
         with row2_c2:
             norm = lambda y: 0.1 + 0.9 * ((y - (M-A)) / (2*A))
             r1, r2 = np.clip(norm(y_t1), 0, 1), np.clip(norm(y_t2), 0, 1)
@@ -337,6 +353,7 @@ with tab1:
             
             y1_d = y_t1/conv; y2_d = y_t2/conv
             
+            # WICHTIG: Figsize (6, 4) -> Breiteres Format
             fig_clk, ax_clk = plt.subplots(subplot_kw={'projection':'polar'}, figsize=(6, 4), facecolor='white')
             
             ax_clk.set_theta_offset(np.pi/2); ax_clk.set_theta_direction(-1)
@@ -375,14 +392,11 @@ with tab2:
 
     if valid_dfs:
         df_combined = pd.concat(valid_dfs, ignore_index=True)
-        
-        # Prüfen ob Analyten einheitlich geschrieben sind (trim whitespace)
-        df_combined['analyte'] = df_combined['analyte'].str.strip().str.title()
-        
         st.success(f"Loaded {len(df_combined)} records.")
         st.markdown("---")
         st.markdown("### 2. Filters & Visualization")
         
+        # Analyte Filter Logic
         available_analytes = sorted(df_combined['analyte'].unique())
         default_ix = available_analytes.index("Glucose") if "Glucose" in available_analytes else 0
         
@@ -391,6 +405,7 @@ with tab2:
         
         df_analyte = df_combined[df_combined['analyte'] == analyte_filter]
         
+        # Einheit bestimmen (Unit)
         if not df_analyte.empty:
             if 'unit' in df_analyte.columns and not df_analyte['unit'].isnull().all():
                 current_unit = df_analyte['unit'].mode()[0]
@@ -399,9 +414,7 @@ with tab2:
         else:
             current_unit = "units"
         
-        # --- WICHTIG: Gender options based on filtered data ---
         gender_opts = ["All"] + sorted(df_analyte['gender'].unique())
-        
         age_opts = ["All"] + list(df_analyte['age_group'].dropna().unique())
         source_opts = sorted(df_analyte['source_file'].unique())
         display_opts = ["Combined"] + source_opts if len(source_opts) > 1 else source_opts
@@ -439,7 +452,7 @@ with tab2:
             ax_box.plot(range(24), medians, 'o-', color=line_color, lw=2, label='Median')
             ax_box.legend(frameon=True, facecolor='white')
         else:
-            ax_box.text(12, 0, "No data found for this selection.", ha='center')
+            ax_box.text(12, 0, "No data found", ha='center')
             
         st.pyplot(fig_box)
         plt.close(fig_box)
@@ -447,20 +460,11 @@ with tab2:
         st.markdown("### 3. Model Parameters")
         results = []
         df_fit_base = df_analyte if display_mode == "Combined" else df_analyte[df_analyte['source_file'] == display_mode]
-        
-        # Safe Unique extraction
         genders = sorted(df_fit_base['gender'].unique())
-        if 'age_group' in df_fit_base.columns:
-            ages = sorted(df_fit_base['age_group'].unique().dropna())
-        else:
-            ages = []
+        ages = df_fit_base['age_group'].cat.categories
         
-        if genders and ages:
-            # Grid berechnen
-            rows = len(ages)
-            cols = len(genders)
-            
-            fig_grid, axes = plt.subplots(rows, cols, figsize=(5*cols, 3*rows), 
+        if genders and not ages.empty:
+            fig_grid, axes = plt.subplots(len(ages), len(genders), figsize=(10, 3*len(ages)), 
                                           sharex=True, sharey=True, squeeze=False, facecolor='white')
             
             for i, ag in enumerate(ages):
