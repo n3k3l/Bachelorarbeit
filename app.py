@@ -297,13 +297,13 @@ with tab1:
             T1, T2, delta = chronomap_delta(A, M, t0)
             delta_disp = delta / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else delta
             
-            # Figsize (5, 5) -> Quadratisch
+            # Quadratisch: (5, 5) -> Höhe entspricht Breite in Streamlit Spalte
             fig_cm, ax_cm = plt.subplots(figsize=(5, 5), facecolor='white')
             pcm = ax_cm.pcolormesh(T2, T1, delta_disp, cmap="coolwarm", shading='gouraud')
             fig_cm.colorbar(pcm, ax=ax_cm, label=f"Diff ({unit})", fraction=0.046, pad=0.04)
             ax_cm.contour(T2, T1, delta, levels=[mu_abs], colors='black', linestyles='dotted')
             
-            # t1 (Schwarz), t2 (Orange)
+            # Linien: t1 Schwarz, t2 Orange
             ax_cm.axhline(t1_hour, color='black', ls='-', lw=2.5, label='t₁')
             ax_cm.axvline(t2_hour, color='#ff7f0e', ls='--', lw=2.5, label='t₂') 
             ax_cm.plot(t2_hour, t1_hour, 'ko', markersize=7, mfc='white')
@@ -311,6 +311,7 @@ with tab1:
             ax_cm.set_xlabel("Timepoint t₂"); ax_cm.set_ylabel("Timepoint t₁")
             ax_cm.legend(fontsize='x-small', loc='upper right', frameon=True, facecolor='white', framealpha=0.9)
             
+            # Maximiert den Plot innerhalb der Figure
             plt.tight_layout()
             st.pyplot(fig_cm, use_container_width=True)
             plt.close(fig_cm)
@@ -323,9 +324,10 @@ with tab1:
             
             y1_d = y_t1/conv; y2_d = y_t2/conv
             
-            # TRICK: Figsize (5, 3.8) -> Geringere Höhe als Breite
-            # Das schneidet den weißen Rand oben/unten weg und macht die Uhr optisch gleich hoch wie das Quadrat
-            fig_clk, ax_clk = plt.subplots(subplot_kw={'projection':'polar'}, figsize=(5, 3.8), facecolor='white')
+            # WICHTIG: Figsize (6, 4) -> Breites Format.
+            # Wenn Streamlit dies auf die Spaltenbreite skaliert, wird die Höhe 
+            # deutlich geringer sein (nur ca. 66% der Breite), wodurch es optisch zur Heatmap passt.
+            fig_clk, ax_clk = plt.subplots(subplot_kw={'projection':'polar'}, figsize=(6, 4), facecolor='white')
             
             ax_clk.set_theta_offset(np.pi/2); ax_clk.set_theta_direction(-1)
             ax_clk.set_xticks(np.linspace(0, 2*np.pi, 12, endpoint=False))
@@ -336,10 +338,12 @@ with tab1:
             ax_clk.plot([theta1, theta1], [0, r1], color='black', lw=3, ls='-', label=f"t₁ ({y1_d:.1f})")
             ax_clk.plot([theta2, theta2], [0, r2], color='#ff7f0e', lw=3, ls='--', label=f"t₂ ({y2_d:.1f})")
             
-            # Legende näher an den Plot rücken (bbox_to_anchor angepasst)
-            ax_clk.legend(loc="lower center", bbox_to_anchor=(0.5, -0.25), ncol=2, frameon=True, facecolor='white', fontsize='small')
+            # Legende näher an den Plot rücken (bbox_to_anchor y auf -0.15 statt tiefer)
+            ax_clk.legend(loc="lower center", bbox_to_anchor=(0.5, -0.2), ncol=2, frameon=True, facecolor='white', fontsize='small')
             
-            plt.tight_layout()
+            # Manuelle Ränder, um den Kreis maximal groß zu machen und Weißraum oben/unten zu entfernen
+            plt.subplots_adjust(top=0.95, bottom=0.20, left=0.05, right=0.95)
+            
             st.pyplot(fig_clk, use_container_width=True)
             plt.close(fig_clk)
                     
