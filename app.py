@@ -15,40 +15,23 @@ st.set_page_config(layout="wide", page_title="Circadian Analysis")
 # OPTIMIZED CSS
 st.markdown("""
     <style>
-    /* 1. Main Background color (Light Professional Gray) */
-    .stApp {
-        background-color: #f0f2f6;
-    }
-    
-    /* 2. General Text Color (Dark Gray/Black for readability on page) */
+    .stApp { background-color: #f0f2f6; }
     h1, h2, h3, h4, h5, h6, .stMarkdown, p, label, li {
         color: #1f1f1f !important;
         font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
     }
-    
-    /* 3. INPUT FIELDS & DROPDOWNS -> DARK BG / WHITE FONT */
     div[data-baseweb="input"] {
         background-color: #4a4a4a !important; 
         border: 1px solid #666 !important;
     }
-    input.st-ai, input.st-ah {
-        color: #ffffff !important; 
-    }
-    
-    /* Dropdowns */
+    input.st-ai, input.st-ah { color: #ffffff !important; }
     div[data-baseweb="select"] > div {
         background-color: #4a4a4a !important; 
         color: #ffffff !important;             
         border: 1px solid #666 !important;
     }
-    div[data-baseweb="select"] span {
-        color: #ffffff !important;
-    }
-    div[data-baseweb="select"] svg {
-        fill: #ffffff !important;
-    }
-
-    /* 4. BUTTONS (Download & Normal) */
+    div[data-baseweb="select"] span { color: #ffffff !important; }
+    div[data-baseweb="select"] svg { fill: #ffffff !important; }
     .stDownloadButton > button, .stButton > button {
         color: #ffffff !important;
         background-color: #4a4a4a !important;
@@ -58,11 +41,7 @@ st.markdown("""
         border-color: #ff4b4b !important;
         color: #ffffff !important;
     }
-    
-    /* 5. Tabs styling */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
+    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
     .stTabs [data-baseweb="tab"] {
         background-color: #ffffff;
         border-radius: 4px 4px 0px 0px;
@@ -75,15 +54,10 @@ st.markdown("""
         border-top: 3px solid #ff4b4b;
         font-weight: bold;
     }
-    
-    /* 6. Slider Text */
-    div[data-testid="stThumbValue"] {
-        color: #1f1f1f !important;
-    }
+    div[data-testid="stThumbValue"] { color: #1f1f1f !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# Set global plot style
 sns.set_style("whitegrid")
 plt.rcParams['text.color'] = '#1f1f1f'
 plt.rcParams['axes.labelcolor'] = '#1f1f1f'
@@ -139,91 +113,113 @@ def generate_template_csv():
 
 @st.cache_data
 def load_and_process_data(_file, file_identifier):
+    """
+    Universal-Loader: Liest Excel (.xlsx) und CSV (Komma oder Semikolon).
+    Bereinigt Spaltennamen von unsichtbaren Zeichen (BOM).
+    """
     try:
-        # 1. Einlesen
-        df = pd.read_csv(_file, sep=None, engine='python')
+        filename = _file.name.lower()
         
-        # Spaltennamen normalisieren
-        df.columns = df.columns.str.strip().str.upper()
-        
-        # Mapping der Screenshot-Spalten
-        COLUMN_MAP = {'ANALYT': 'analyte', 'VALUE': 'value', 'DIM': 'unit', 'TIME': 'timestamp', 'SEX': 'gender', 'AGE': 'age'}
-        
-        required_cols = set(COLUMN_MAP.keys())
-        found_cols = set(df.columns)
-        
-        # ─── NEU: ROBUSTERES MAPPING ───
-        # Wenn nicht ALLE Spalten da sind, versuchen wir intelligente Synonyme zu finden
-        if not required_cols.issubset(found_cols):
-            # Erweitertes Fallback-Mapping (inkl. SEX und GESCHLECHT)
-            fallback_map = {
-                'GENDER': 'gender', 'SEX': 'gender', 'GESCHLECHT': 'gender', 
-                'AGE': 'age', 'ALTER': 'age',
-                'VALUE': 'value', 'WERT': 'value', 'ERGEBNIS': 'value',
-                'ANALYSE_DATE': 'timestamp', 'DATE': 'timestamp', 'ZEIT': 'timestamp', 'TIME': 'timestamp',
-                'ANALYT': 'analyte', 'PARAMETER': 'analyte'
-            }
-            renamed = False
-            for k, v in fallback_map.items():
-                if k in found_cols and v not in df.columns: # Nur umbenennen wenn Ziel noch nicht existiert
-                    df.rename(columns={k: v}, inplace=True)
-                    renamed = True
-            
-            # Mindestanforderung prüfen
-            current_cols = set(df.columns)
-            if not {'value', 'timestamp'}.issubset(current_cols):
-                 st.error(f"Error in '{file_identifier}': Missing crucial columns (Value/Time). Found: {list(current_cols)}")
-                 return None
+        # 1. EXCEL ODER CSV ERKENNUNG
+        if filename.endswith('.xlsx') or filename.endswith('.xls'):
+            df = pd.read_excel(_file)
         else:
-            df = df.rename(columns=COLUMN_MAP)
+            # Versuch 1: Standard CSV (engine python erkennt vieles automatisch)
+            # encoding='utf-8-sig' entfernt automatisch BOM (\ufeff)
+            try:
+                df = pd.read_csv(_file, sep=None, engine='python', encoding='utf-8-sig')
+            except:
+                # Fallback: Windows Encoding
+                _file.seek(0)
+                df = pd.read_csv(_file, sep=None, engine='python', encoding='latin1')
 
-        # 2. Werte bereinigen
+        # 2. SPALTENNAMEN BEREINIGEN (Kritisch!)
+        # Entfernt Leerzeichen, BOM, Anführungszeichen und macht alles uppercase
+        df.columns = df.columns.astype(str).str.strip().str.replace('"', '').str.replace("'", "").str.upper()
+        
+        # Check: Wenn nur 1 Spalte erkannt wurde, ist das Trennzeichen falsch
+        if len(df.columns) == 1 and filename.endswith('.csv'):
+            _file.seek(0)
+            df = pd.read_csv(_file, sep=';', engine='python')
+            df.columns = df.columns.astype(str).str.strip().str.replace('"', '').str.replace("'", "").str.upper()
+
+        # 3. MAPPING (Synonym-Suche)
+        column_candidates = {
+            'value':     ['VALUE', 'WERT', 'ERGEBNIS', 'RESULT', 'MESSWERT', 'CONCENTRATION'],
+            'timestamp': ['TIME', 'ZEIT', 'DATE', 'DATUM', 'ANALYSE_DATE', 'TIMESTAMP'],
+            'gender':    ['SEX', 'GENDER', 'GESCHLECHT'],
+            'age':       ['AGE', 'ALTER', 'JAHRE'],
+            'analyte':   ['ANALYT', 'ANALYTE', 'PARAMETER', 'STOFF', 'TEST'],
+            'unit':      ['DIM', 'UNIT', 'EINHEIT', 'DIMENSION']
+        }
+        
+        found_mapping = {}
+        existing_cols = list(df.columns)
+        
+        for target, candidates in column_candidates.items():
+            for candidate in candidates:
+                if candidate in existing_cols:
+                    found_mapping[candidate] = target
+                    break 
+        
+        df.rename(columns=found_mapping, inplace=True)
+        
+        # 4. PRÜFUNG
+        if 'value' not in df.columns or 'timestamp' not in df.columns:
+            st.error(f"Error in '{file_identifier}': Konnte Spalten nicht zuordnen. Gefunden: {existing_cols}")
+            return None
+
+        # --- DATEN AUFBEREITUNG ---
+        
+        # Value (Komma -> Punkt)
         if df['value'].dtype == object:
             df['value'] = df['value'].astype(str).str.replace(',', '.', regex=False)
         df['value'] = pd.to_numeric(df['value'], errors='coerce')
-        
-        # 3. Analyt Name
-        if 'analyte' in df.columns:
-            df['analyte'] = df['analyte'].astype(str).str.title()
-        else:
-            df['analyte'] = "Unknown"
-            
-        # 4. Daten filtern
         df.dropna(subset=['value'], inplace=True)
-        
-        if 'age' in df.columns:
-            df['age'] = pd.to_numeric(df['age'], errors='coerce').fillna(0).astype(int)
-        else:
-            df['age'] = 35 # Default
-            
-        # 5. Zeitstempel
+
+        # Timestamp
         df['timestamp'] = pd.to_datetime(df['timestamp'], dayfirst=True, errors='coerce')
         df.dropna(subset=['timestamp'], inplace=True)
         df['hour_int'] = df['timestamp'].dt.hour
         
-        # 6. GESCHLECHT BEREINIGEN (SEHR ROBUST)
-        # Erkennt "M", "Male", "Mann", "männlich", "Herr" -> "Male"
-        # Erkennt "F", "Female", "Frau", "w", "weiblich" -> "Female"
+        # Analyte (Hier lag das Problem beim User -> ANALYT wurde nicht gefunden)
+        if 'analyte' in df.columns:
+            df['analyte'] = df['analyte'].astype(str).str.strip().str.title()
+        else:
+            # Falls ANALYT wirklich fehlt, setzen wir einen Default, damit das Script nicht crasht
+            df['analyte'] = "Unknown Analyte"
+
+        # Alter
+        if 'age' in df.columns:
+            df['age'] = pd.to_numeric(df['age'], errors='coerce').fillna(35).astype(int)
+        else:
+            df['age'] = 35
+            
+        # Geschlecht
         if 'gender' in df.columns:
             def clean_gender(x):
                 s = str(x).strip().upper()
                 if not s or s == 'NAN': return 'Other'
-                # Check Male
                 if s.startswith('M') or s.startswith('H'): return 'Male'
-                # Check Female
                 if s.startswith('F') or s.startswith('W'): return 'Female'
                 return 'Other'
             df['gender'] = df['gender'].apply(clean_gender)
         else:
-            # Wenn keine Spalte gefunden wurde, aber Daten da sind -> Other
             df['gender'] = 'Other'
             
-        # 7. Altersgruppen
+        # Einheit
+        if 'unit' in df.columns:
+            df['unit'] = df['unit'].astype(str).str.strip()
+        else:
+            df['unit'] = 'units'
+            
         df['age_group'] = pd.cut(df['age'], bins=[0, 30, 50, 120], labels=["< 30 years", "30-50 years", "> 50 years"], right=False)
         df['source_file'] = file_identifier
+        
         return df
     except Exception as e:
-        st.error(f"Error processing '{file_identifier}': {e}"); return None
+        st.error(f"Kritischer Fehler bei '{file_identifier}': {e}")
+        return None
 
 def get_fitted_parameters(df_group, value_column='value'):
     if len(df_group) < 5: return np.nan, np.nan, np.nan
@@ -281,13 +277,11 @@ with tab1:
         mu_abs = M * MU_perc / 100
 
     with right:
-        # Berechnungen
         t_arr = np.linspace(0, 24, 500)
         y_arr = circadian(t_arr, M, A, t0)
         y_disp = y_arr / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else y_arr
         mu_disp = mu_abs / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else mu_abs
 
-        # ─── OBEN: Hauptplot ───
         fig_sin, ax_sin = plt.subplots(figsize=(10, 3.5), facecolor='white')
         ax_sin.set_title(f"Simulated Diurnal Fluctuation for {analyte}", fontsize=12)
         ax_sin.plot(t_arr, y_disp, color="cornflowerblue", alpha=0.9, lw=2, label="Expected Profile")
@@ -303,7 +297,6 @@ with tab1:
         
         st.markdown("---")
 
-        # ─── UNTEN: Zwei Spalten (Controls + Plots) ───
         row1_c1, row1_c2 = st.columns(2, gap="medium")
         with row1_c1:
             st.markdown("##### Chronomap")
@@ -321,10 +314,8 @@ with tab1:
             else: 
                 st.error(f"**Not Comparable**\nΔ = {diff/conv:.1f} (> {mu_abs/conv:.1f})")
 
-        # Zeile 2: Die Diagramme
         row2_c1, row2_c2 = st.columns(2, gap="medium")
         
-        # --- LINKER PLOT (Heatmap) ---
         with row2_c1:
             T1, T2, delta = chronomap_delta(A, M, t0)
             delta_disp = delta / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else delta
@@ -333,40 +324,30 @@ with tab1:
             pcm = ax_cm.pcolormesh(T2, T1, delta_disp, cmap="coolwarm", shading='gouraud')
             fig_cm.colorbar(pcm, ax=ax_cm, label=f"Diff ({unit})", fraction=0.046, pad=0.04)
             ax_cm.contour(T2, T1, delta, levels=[mu_abs], colors='black', linestyles='dotted')
-            
             ax_cm.axhline(t1_hour, color='black', ls='-', lw=2.5, label='t₁')
             ax_cm.axvline(t2_hour, color='#ff7f0e', ls='--', lw=2.5, label='t₂') 
             ax_cm.plot(t2_hour, t1_hour, 'ko', markersize=7, mfc='white')
-            
             ax_cm.set_xlabel("Timepoint t₂"); ax_cm.set_ylabel("Timepoint t₁")
             ax_cm.legend(fontsize='x-small', loc='upper right', frameon=True, facecolor='white', framealpha=0.9)
-            
             plt.tight_layout()
             st.pyplot(fig_cm, use_container_width=True)
             plt.close(fig_cm)
             
-        # --- RECHTER PLOT (Uhr) ---
         with row2_c2:
             norm = lambda y: 0.1 + 0.9 * ((y - (M-A)) / (2*A))
             r1, r2 = np.clip(norm(y_t1), 0, 1), np.clip(norm(y_t2), 0, 1)
             theta1, theta2 = (t1_hour/24)*2*np.pi, (t2_hour/24)*2*np.pi
-            
             y1_d = y_t1/conv; y2_d = y_t2/conv
             
-            # WICHTIG: Figsize (6, 4) -> Breiteres Format
             fig_clk, ax_clk = plt.subplots(subplot_kw={'projection':'polar'}, figsize=(6, 4), facecolor='white')
-            
             ax_clk.set_theta_offset(np.pi/2); ax_clk.set_theta_direction(-1)
             ax_clk.set_xticks(np.linspace(0, 2*np.pi, 12, endpoint=False))
             ax_clk.set_xticklabels([f"{h*2}" for h in range(12)])
             ax_clk.set_yticklabels([])
-            
             ax_clk.plot([theta1, theta1], [0, r1], color='black', lw=3, ls='-', label=f"t₁ ({y1_d:.1f})")
             ax_clk.plot([theta2, theta2], [0, r2], color='#ff7f0e', lw=3, ls='--', label=f"t₂ ({y2_d:.1f})")
-            
             ax_clk.legend(loc="lower center", bbox_to_anchor=(0.5, -0.2), ncol=2, frameon=True, facecolor='white', fontsize='small')
             plt.subplots_adjust(top=0.95, bottom=0.20, left=0.05, right=0.95)
-            
             st.pyplot(fig_clk, use_container_width=True)
             plt.close(fig_clk)
 
@@ -381,22 +362,24 @@ with tab2:
         st.download_button("📄 Download CSV Template", csv_data, "circadian_template.csv", "text/csv")
         
     df1, df2 = None, None
+    # Support for xlsx and csv
     with col_up1:
-        f1 = st.file_uploader("Upload Control Group", type=["csv"], key="file1")
+        f1 = st.file_uploader("Upload Control Group", type=["csv", "xlsx"], key="file1")
         if f1: df1 = load_and_process_data(f1, "File 1")
     with col_up2:
-        f2 = st.file_uploader("Upload Test Group", type=["csv"], key="file2")
+        f2 = st.file_uploader("Upload Test Group", type=["csv", "xlsx"], key="file2")
         if f2: df2 = load_and_process_data(f2, "File 2")
 
     valid_dfs = [df for df in [df1, df2] if df is not None]
 
     if valid_dfs:
         df_combined = pd.concat(valid_dfs, ignore_index=True)
+        df_combined['analyte'] = df_combined['analyte'].str.strip().str.title()
+        
         st.success(f"Loaded {len(df_combined)} records.")
         st.markdown("---")
         st.markdown("### 2. Filters & Visualization")
         
-        # Analyte Filter Logic
         available_analytes = sorted(df_combined['analyte'].unique())
         default_ix = available_analytes.index("Glucose") if "Glucose" in available_analytes else 0
         
@@ -404,15 +387,7 @@ with tab2:
         analyte_filter = f_col1.selectbox("Analyte", available_analytes, index=default_ix)
         
         df_analyte = df_combined[df_combined['analyte'] == analyte_filter]
-        
-        # Einheit bestimmen (Unit)
-        if not df_analyte.empty:
-            if 'unit' in df_analyte.columns and not df_analyte['unit'].isnull().all():
-                current_unit = df_analyte['unit'].mode()[0]
-            else:
-                current_unit = "units"
-        else:
-            current_unit = "units"
+        current_unit = df_analyte['unit'].mode()[0] if not df_analyte['unit'].empty else "units"
         
         gender_opts = ["All"] + sorted(df_analyte['gender'].unique())
         age_opts = ["All"] + list(df_analyte['age_group'].dropna().unique())
@@ -461,10 +436,14 @@ with tab2:
         results = []
         df_fit_base = df_analyte if display_mode == "Combined" else df_analyte[df_analyte['source_file'] == display_mode]
         genders = sorted(df_fit_base['gender'].unique())
-        ages = df_fit_base['age_group'].cat.categories
+        if 'age_group' in df_fit_base.columns:
+            ages = sorted(df_fit_base['age_group'].unique().dropna())
+        else:
+            ages = []
         
-        if genders and not ages.empty:
-            fig_grid, axes = plt.subplots(len(ages), len(genders), figsize=(10, 3*len(ages)), 
+        if genders and ages:
+            rows, cols = len(ages), len(genders)
+            fig_grid, axes = plt.subplots(rows, cols, figsize=(5*cols, 3*rows), 
                                           sharex=True, sharey=True, squeeze=False, facecolor='white')
             
             for i, ag in enumerate(ages):
@@ -488,4 +467,4 @@ with tab2:
             if results:
                 st.dataframe(pd.DataFrame(results).set_index(['Gender', 'Age']).style.format("{:.2f}"))
     else:
-        st.warning("Please upload a CSV file using the template structure to begin.")
+        st.warning("Please upload a CSV or Excel file to begin.")
