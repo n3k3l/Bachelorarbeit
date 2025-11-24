@@ -15,46 +15,32 @@ st.set_page_config(layout="wide", page_title="Circadian Analysis")
 # OPTIMIZED CSS
 st.markdown("""
     <style>
-    /* 1. Main Background color (Light Professional Gray) */
-    .stApp {
-        background-color: #f0f2f6;
-    }
+    /* 1. Main Background color */
+    .stApp { background-color: #f0f2f6; }
     
-    /* 2. General Text Color (Dark Gray/Black for readability on page) */
-    h1, h2, h3, h4, h5, h6, .stMarkdown, p, label {
+    /* 2. General Text Color */
+    h1, h2, h3, h4, h5, h6, .stMarkdown, p, label, li {
         color: #1f1f1f !important;
         font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
     }
     
-    /* 3. INPUT FIELDS & DROPDOWNS -> DARK BG / WHITE FONT */
-    
-    /* Input Boxes (Number, Text, Time) */
+    /* 3. INPUT FIELDS & DROPDOWNS */
     div[data-baseweb="input"] {
-        background-color: #4a4a4a !important; /* Dark Gray Background */
+        background-color: #4a4a4a !important; 
         border: 1px solid #666 !important;
     }
-    input.st-ai, input.st-ah {
-        color: #ffffff !important; /* White Font */
-    }
+    input.st-ai, input.st-ah { color: #ffffff !important; }
     
-    /* Dropdowns (Selectbox) Container */
+    /* Dropdowns */
     div[data-baseweb="select"] > div {
-        background-color: #4a4a4a !important; /* Dark Gray Background */
-        color: #ffffff !important;             /* White Font */
+        background-color: #4a4a4a !important; 
+        color: #ffffff !important;             
         border: 1px solid #666 !important;
     }
-    
-    /* Text inside Dropdowns */
-    div[data-baseweb="select"] span {
-        color: #ffffff !important;
-    }
-    
-    /* Dropdown Arrow Icon */
-    div[data-baseweb="select"] svg {
-        fill: #ffffff !important;
-    }
+    div[data-baseweb="select"] span { color: #ffffff !important; }
+    div[data-baseweb="select"] svg { fill: #ffffff !important; }
 
-    /* 4. BUTTONS (Download & Normal) -> DARK BG / WHITE FONT */
+    /* 4. BUTTONS */
     .stDownloadButton > button, .stButton > button {
         color: #ffffff !important;
         background-color: #4a4a4a !important;
@@ -66,9 +52,7 @@ st.markdown("""
     }
     
     /* 5. Tabs styling */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
+    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
     .stTabs [data-baseweb="tab"] {
         background-color: #ffffff;
         border-radius: 4px 4px 0px 0px;
@@ -82,16 +66,12 @@ st.markdown("""
         font-weight: bold;
     }
     
-    /* 6. Slider Text (Make sure numbers are visible) */
-    div[data-testid="stThumbValue"] {
-        color: #1f1f1f !important;
-    }
+    /* 6. Slider Text */
+    div[data-testid="stThumbValue"] { color: #1f1f1f !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# Set global plot style
 sns.set_style("whitegrid")
-# Ensure text in plots is dark (since plot bg is white)
 plt.rcParams['text.color'] = '#1f1f1f'
 plt.rcParams['axes.labelcolor'] = '#1f1f1f'
 plt.rcParams['xtick.color'] = '#1f1f1f'
@@ -146,50 +126,89 @@ def generate_template_csv():
 
 @st.cache_data
 def load_and_process_data(_file, file_identifier):
+    """
+    Lädt CSV-Dateien extrem robust ein, indem es nach Synonymen für Spalten sucht.
+    """
     try:
         df = pd.read_csv(_file, sep=None, engine='python')
+        # Alle Spaltennamen bereinigen (Trim + Uppercase)
         df.columns = df.columns.str.strip().str.upper()
         
-        COLUMN_MAP = {'ANALYT': 'analyte', 'VALUE': 'value', 'DIM': 'unit', 'TIME': 'timestamp', 'SEX': 'gender', 'AGE': 'age'}
+        # Mapping-Definition: Ziel-Name -> Liste möglicher CSV-Header
+        # Die Reihenfolge in der Liste ist die Priorität.
+        column_candidates = {
+            'value':     ['VALUE', 'WERT', 'ERGEBNIS', 'RESULT', 'MESSWERT'],
+            'timestamp': ['TIME', 'ZEIT', 'DATE', 'DATUM', 'ANALYSE_DATE', 'TIMESTAMP'],
+            'gender':    ['SEX', 'GENDER', 'GESCHLECHT'],
+            'age':       ['AGE', 'ALTER', 'JAHRE'],
+            'analyte':   ['ANALYT', 'ANALYTE', 'PARAMETER', 'STOFF'],
+            'unit':      ['DIM', 'UNIT', 'EINHEIT']
+        }
         
-        required_cols = set(COLUMN_MAP.keys())
-        found_cols = set(df.columns)
+        # Umbennung durchführen
+        found_mapping = {}
+        existing_cols = list(df.columns)
         
-        if not required_cols.issubset(found_cols):
-            fallback_map = {'GENDER': 'gender', 'AGE': 'age', 'VALUE': 'value', 'ANALYSE_DATE': 'timestamp'}
-            renamed = False
-            for k, v in fallback_map.items():
-                if k in found_cols:
-                    df.rename(columns={k: v}, inplace=True); renamed = True
-            if not renamed:
-                st.error(f"Error in '{file_identifier}': Missing columns. Expected: {list(required_cols)}")
-                return None
-        else:
-            df = df.rename(columns=COLUMN_MAP)
+        for target, candidates in column_candidates.items():
+            for candidate in candidates:
+                if candidate in existing_cols:
+                    found_mapping[candidate] = target
+                    break # Ersten Treffer nehmen
+        
+        df.rename(columns=found_mapping, inplace=True)
+        
+        # Prüfung: Haben wir die Mindest-Spalten?
+        if 'value' not in df.columns or 'timestamp' not in df.columns:
+            st.error(f"Error in '{file_identifier}': Konnte 'Value' oder 'Time' Spalte nicht finden. Gefundene Spalten: {existing_cols}")
+            return None
 
+        # --- DATEN BEREINIGUNG ---
+        
+        # 1. Werte (Komma -> Punkt)
         if df['value'].dtype == object:
             df['value'] = df['value'].astype(str).str.replace(',', '.', regex=False)
         df['value'] = pd.to_numeric(df['value'], errors='coerce')
-        
-        if 'analyte' in df.columns:
-            df['analyte'] = df['analyte'].astype(str).str.title()
-        else:
-            df['analyte'] = "Unknown"
-            
-        df.dropna(subset=['value', 'age'], inplace=True)
-        df['age'] = df['age'].astype(int)
+        df.dropna(subset=['value'], inplace=True)
+
+        # 2. Zeitstempel
         df['timestamp'] = pd.to_datetime(df['timestamp'], dayfirst=True, errors='coerce')
         df.dropna(subset=['timestamp'], inplace=True)
         df['hour_int'] = df['timestamp'].dt.hour
         
-        if 'gender' in df.columns:
-            df['gender'] = df['gender'].astype(str).str.upper().map({'M': 'Male', 'F': 'Female'}).fillna('Other')
+        # 3. Analyt (Standardisieren)
+        if 'analyte' in df.columns:
+            df['analyte'] = df['analyte'].astype(str).str.strip().str.title()
+        else:
+            df['analyte'] = "Unknown"
+
+        # 4. Alter (Fallback 35)
+        if 'age' in df.columns:
+            df['age'] = pd.to_numeric(df['age'], errors='coerce').fillna(35).astype(int)
+        else:
+            df['age'] = 35
             
+        # 5. Geschlecht (Robustes Parsing)
+        if 'gender' in df.columns:
+            def clean_gender(x):
+                s = str(x).strip().upper()
+                if not s or s == 'NAN': return 'Other'
+                # Prüfe auf M, Male, Mann, Herr, H
+                if s.startswith('M') or s.startswith('H'): return 'Male'
+                # Prüfe auf F, Female, Frau, W, Weiblich
+                if s.startswith('F') or s.startswith('W'): return 'Female'
+                return 'Other'
+            df['gender'] = df['gender'].apply(clean_gender)
+        else:
+            df['gender'] = 'Other'
+            
+        # 6. Zusatzinfos
         df['age_group'] = pd.cut(df['age'], bins=[0, 30, 50, 120], labels=["< 30 years", "30-50 years", "> 50 years"], right=False)
         df['source_file'] = file_identifier
+        
         return df
     except Exception as e:
-        st.error(f"Error processing '{file_identifier}': {e}"); return None
+        st.error(f"Kritischer Fehler beim Laden von '{file_identifier}': {e}")
+        return None
 
 def get_fitted_parameters(df_group, value_column='value'):
     if len(df_group) < 5: return np.nan, np.nan, np.nan
@@ -247,13 +266,12 @@ with tab1:
         mu_abs = M * MU_perc / 100
 
     with right:
-        # Berechnungen
         t_arr = np.linspace(0, 24, 500)
         y_arr = circadian(t_arr, M, A, t0)
         y_disp = y_arr / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else y_arr
         mu_disp = mu_abs / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else mu_abs
 
-        # ─── OBEN: Hauptplot (Sinuskurve) ───
+        # ─── OBEN: Hauptplot ───
         fig_sin, ax_sin = plt.subplots(figsize=(10, 3.5), facecolor='white')
         ax_sin.set_title(f"Simulated Diurnal Fluctuation for {analyte}", fontsize=12)
         ax_sin.plot(t_arr, y_disp, color="cornflowerblue", alpha=0.9, lw=2, label="Expected Profile")
@@ -269,9 +287,7 @@ with tab1:
         
         st.markdown("---")
 
-        # ─── UNTEN: Zwei Spalten (Controls + Plots) ───
-        
-        # Zeile 1: Inputs & Status
+        # ─── UNTEN: Zwei Spalten ───
         row1_c1, row1_c2 = st.columns(2, gap="medium")
         with row1_c1:
             st.markdown("##### Chronomap")
@@ -297,13 +313,11 @@ with tab1:
             T1, T2, delta = chronomap_delta(A, M, t0)
             delta_disp = delta / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else delta
             
-            # Quadratisch: (5, 5) -> Höhe entspricht Breite in Streamlit Spalte
             fig_cm, ax_cm = plt.subplots(figsize=(5, 5), facecolor='white')
             pcm = ax_cm.pcolormesh(T2, T1, delta_disp, cmap="coolwarm", shading='gouraud')
             fig_cm.colorbar(pcm, ax=ax_cm, label=f"Diff ({unit})", fraction=0.046, pad=0.04)
             ax_cm.contour(T2, T1, delta, levels=[mu_abs], colors='black', linestyles='dotted')
             
-            # Linien: t1 Schwarz, t2 Orange
             ax_cm.axhline(t1_hour, color='black', ls='-', lw=2.5, label='t₁')
             ax_cm.axvline(t2_hour, color='#ff7f0e', ls='--', lw=2.5, label='t₂') 
             ax_cm.plot(t2_hour, t1_hour, 'ko', markersize=7, mfc='white')
@@ -311,12 +325,11 @@ with tab1:
             ax_cm.set_xlabel("Timepoint t₂"); ax_cm.set_ylabel("Timepoint t₁")
             ax_cm.legend(fontsize='x-small', loc='upper right', frameon=True, facecolor='white', framealpha=0.9)
             
-            # Maximiert den Plot innerhalb der Figure
             plt.tight_layout()
             st.pyplot(fig_cm, use_container_width=True)
             plt.close(fig_cm)
             
-        # --- RECHTER PLOT (Uhr) ---
+        # --- RECHTER PLOT (Uhr - Breites Format) ---
         with row2_c2:
             norm = lambda y: 0.1 + 0.9 * ((y - (M-A)) / (2*A))
             r1, r2 = np.clip(norm(y_t1), 0, 1), np.clip(norm(y_t2), 0, 1)
@@ -324,9 +337,6 @@ with tab1:
             
             y1_d = y_t1/conv; y2_d = y_t2/conv
             
-            # WICHTIG: Figsize (6, 4) -> Breites Format.
-            # Wenn Streamlit dies auf die Spaltenbreite skaliert, wird die Höhe 
-            # deutlich geringer sein (nur ca. 66% der Breite), wodurch es optisch zur Heatmap passt.
             fig_clk, ax_clk = plt.subplots(subplot_kw={'projection':'polar'}, figsize=(6, 4), facecolor='white')
             
             ax_clk.set_theta_offset(np.pi/2); ax_clk.set_theta_direction(-1)
@@ -334,19 +344,15 @@ with tab1:
             ax_clk.set_xticklabels([f"{h*2}" for h in range(12)])
             ax_clk.set_yticklabels([])
             
-            # t1 (Schwarz), t2 (Orange)
             ax_clk.plot([theta1, theta1], [0, r1], color='black', lw=3, ls='-', label=f"t₁ ({y1_d:.1f})")
             ax_clk.plot([theta2, theta2], [0, r2], color='#ff7f0e', lw=3, ls='--', label=f"t₂ ({y2_d:.1f})")
             
-            # Legende näher an den Plot rücken (bbox_to_anchor y auf -0.15 statt tiefer)
             ax_clk.legend(loc="lower center", bbox_to_anchor=(0.5, -0.2), ncol=2, frameon=True, facecolor='white', fontsize='small')
-            
-            # Manuelle Ränder, um den Kreis maximal groß zu machen und Weißraum oben/unten zu entfernen
             plt.subplots_adjust(top=0.95, bottom=0.20, left=0.05, right=0.95)
             
             st.pyplot(fig_clk, use_container_width=True)
             plt.close(fig_clk)
-                    
+
 # --- TAB 2: DATA ANALYSIS ---
 with tab2:
     st.markdown("### 1. Data Import")
@@ -369,11 +375,14 @@ with tab2:
 
     if valid_dfs:
         df_combined = pd.concat(valid_dfs, ignore_index=True)
+        
+        # Prüfen ob Analyten einheitlich geschrieben sind (trim whitespace)
+        df_combined['analyte'] = df_combined['analyte'].str.strip().str.title()
+        
         st.success(f"Loaded {len(df_combined)} records.")
         st.markdown("---")
         st.markdown("### 2. Filters & Visualization")
         
-        # Analyte Filter Logic
         available_analytes = sorted(df_combined['analyte'].unique())
         default_ix = available_analytes.index("Glucose") if "Glucose" in available_analytes else 0
         
@@ -381,9 +390,18 @@ with tab2:
         analyte_filter = f_col1.selectbox("Analyte", available_analytes, index=default_ix)
         
         df_analyte = df_combined[df_combined['analyte'] == analyte_filter]
-        current_unit = df_analyte['unit'].mode()[0] if not df_analyte['unit'].empty else "units"
         
+        if not df_analyte.empty:
+            if 'unit' in df_analyte.columns and not df_analyte['unit'].isnull().all():
+                current_unit = df_analyte['unit'].mode()[0]
+            else:
+                current_unit = "units"
+        else:
+            current_unit = "units"
+        
+        # --- WICHTIG: Gender options based on filtered data ---
         gender_opts = ["All"] + sorted(df_analyte['gender'].unique())
+        
         age_opts = ["All"] + list(df_analyte['age_group'].dropna().unique())
         source_opts = sorted(df_analyte['source_file'].unique())
         display_opts = ["Combined"] + source_opts if len(source_opts) > 1 else source_opts
@@ -397,7 +415,7 @@ with tab2:
         if age_filter != "All": df_plot = df_plot[df_plot['age_group'] == age_filter]
         
         if display_mode == "Combined":
-            plot_color, line_color = '#d9d9d9', '#1f1f1f' # Light gray fill, dark line
+            plot_color, line_color = '#d9d9d9', '#1f1f1f' 
         elif display_mode == "File 1":
             df_plot = df_plot[df_plot['source_file'] == 'File 1']
             plot_color, line_color = '#a0c4ff', '#003366'
@@ -405,7 +423,6 @@ with tab2:
             df_plot = df_plot[df_plot['source_file'] == 'File 2']
             plot_color, line_color = '#ffadad', '#800000'
 
-        # Boxplot with White Card Background
         fig_box, ax_box = plt.subplots(figsize=(12, 6), facecolor='white')
         ax_box.set_title(f"{analyte_filter} ({display_mode}) - {gender_filter}, {age_filter}")
         ax_box.set_xlabel("Time of Day (h)")
@@ -422,7 +439,7 @@ with tab2:
             ax_box.plot(range(24), medians, 'o-', color=line_color, lw=2, label='Median')
             ax_box.legend(frameon=True, facecolor='white')
         else:
-            ax_box.text(12, 0, "No data found", ha='center')
+            ax_box.text(12, 0, "No data found for this selection.", ha='center')
             
         st.pyplot(fig_box)
         plt.close(fig_box)
@@ -430,11 +447,20 @@ with tab2:
         st.markdown("### 3. Model Parameters")
         results = []
         df_fit_base = df_analyte if display_mode == "Combined" else df_analyte[df_analyte['source_file'] == display_mode]
-        genders = sorted(df_fit_base['gender'].unique())
-        ages = df_fit_base['age_group'].cat.categories
         
-        if genders and not ages.empty:
-            fig_grid, axes = plt.subplots(len(ages), len(genders), figsize=(10, 3*len(ages)), 
+        # Safe Unique extraction
+        genders = sorted(df_fit_base['gender'].unique())
+        if 'age_group' in df_fit_base.columns:
+            ages = sorted(df_fit_base['age_group'].unique().dropna())
+        else:
+            ages = []
+        
+        if genders and ages:
+            # Grid berechnen
+            rows = len(ages)
+            cols = len(genders)
+            
+            fig_grid, axes = plt.subplots(rows, cols, figsize=(5*cols, 3*rows), 
                                           sharex=True, sharey=True, squeeze=False, facecolor='white')
             
             for i, ag in enumerate(ages):
