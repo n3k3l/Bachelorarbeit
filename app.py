@@ -12,42 +12,71 @@ import io
 st.set_page_config(layout="wide", page_title="Diurnal Fluctuations Analysis")
 
 # DEFINITIONEN FÜR FARBEN
-BG_COLOR = "#f0f2f6"
-TEXT_COLOR = "#000000"
+BG_COLOR = "#f0f2f6"     # Hellgrauer Hintergrund
+TEXT_COLOR = "#000000"   # Schwarzer Text für die Seite
+WIDGET_TEXT = "#ffffff"  # Weißer Text für Buttons/Inputs
 
-# CSS FÜR STYLING (Hintergrund grau, Schrift schwarz erzwingen)
+# CSS FÜR STYLING
 st.markdown(f"""
     <style>
-    /* Haupt-Hintergrund */
+    /* 1. Haupt-Hintergrund der App */
     .stApp {{
         background-color: {BG_COLOR};
     }}
     
-    /* Erzwinge dunkle Schriftfarbe für alle Standard-Elemente */
-    h1, h2, h3, h4, h5, h6, p, span, div {{
+    /* 2. Genereller Text auf der Seite (Überschriften, Paragraphen, Beschriftungen) -> SCHWARZ */
+    h1, h2, h3, h4, h5, h6, p, li, span {{
         color: {TEXT_COLOR} !important;
     }}
     
-    /* Speziell für Labels über den Widgets (z.B. "Analyte", "Gender") */
-    .stSelectbox label, .stNumberInput label, .stSlider label, .stTimeInput label, .stRadio label, .stFileUploader label {{
+    /* Labels ÜBER den Inputs (z.B. "Analyte", "Upload File") -> SCHWARZ */
+    .stSelectbox label, .stNumberInput label, .stSlider label, 
+    .stTimeInput label, .stRadio label, .stFileUploader label, 
+    .stCheckbox label {{
         color: {TEXT_COLOR} !important;
         font-weight: 600;
     }}
+
+    /* 3. Text INNERHALB von dunklen Widgets (Buttons, Inputs, Uploader) -> WEISS */
     
-    /* Radio Buttons Text */
+    /* Buttons (Download, Browse files) */
+    button {{
+        color: {WIDGET_TEXT} !important;
+    }}
+    
+    /* File Uploader Dropzone Text ("Drag and drop file here") */
+    [data-testid="stFileUploader"] section div {{
+        color: {WIDGET_TEXT} !important;
+    }}
+    /* Die kleine Schrift im Uploader ("Limit 200MB...") */
+    [data-testid="stFileUploader"] section small {{
+        color: #cccccc !important;
+    }}
+
+    /* Selectboxen & Eingabefelder (der ausgewählte Wert) */
+    .stSelectbox div[data-baseweb="select"] span {{
+        color: {WIDGET_TEXT} !important;
+    }}
+    .stNumberInput input, .stTimeInput input {{
+        color: {WIDGET_TEXT} !important;
+    }}
+    
+    /* Radio Buttons Optionen */
     .stRadio div[role='radiogroup'] label div {{
         color: {TEXT_COLOR} !important;
     }}
-    
-    /* Tabs Styling anpassen */
+
+    /* Tabs Styling */
     button[data-baseweb="tab"] {{
-        color: {TEXT_COLOR} !important;
+        color: {TEXT_COLOR} !important; /* Inaktive Tabs schwarz */
     }}
-    
-    /* Info-Boxen etwas abdunkeln, damit weißer Text lesbar bleibt, falls Streamlit das so will,
-       oder den Text darin dunkel machen */
+    button[data-baseweb="tab"][aria-selected="true"] {{
+        color: #d10000 !important; /* Aktiver Tab rötlich hervorheben */
+    }}
+
+    /* Expander/Alerts lesbar machen */
     .stAlert {{
-        color: {TEXT_COLOR};
+        color: {TEXT_COLOR} !important;
     }}
     </style>
     """, unsafe_allow_html=True)
@@ -103,7 +132,7 @@ def generate_template_csv():
 # Helper um Plots an den grauen Hintergrund anzupassen
 def style_plot(fig, ax):
     fig.patch.set_facecolor(BG_COLOR)
-    ax.set_facecolor(BG_COLOR) # Oder 'white' lassen, wenn man den Kontrast im Plot will
+    ax.set_facecolor(BG_COLOR)
     # Axenbeschriftung schwarz machen
     ax.xaxis.label.set_color('black')
     ax.yaxis.label.set_color('black')
@@ -169,10 +198,9 @@ with tab1:
         mu_abs_display = mu_abs / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else mu_abs
         
         # --- Plot 1: Time Series ---
-        # Request: t1 black solid
         fig_sin, ax_sin = plt.subplots(figsize=(10, 3.5))
-        style_plot(fig_sin, ax_sin) # Apply BG style
-        ax_sin.set_facecolor("white") # Keep graph area white for contrast vs blue line
+        style_plot(fig_sin, ax_sin)
+        ax_sin.set_facecolor("white") # Keep graph area white for contrast
         
         ax_sin.set_title(f"Simulated Diurnal Fluctuation for {analyte}", fontsize=12, color='black')
         ax_sin.plot(t_arr, y_arr_display, color="cornflowerblue", label="Expected Profile", lw=3)
@@ -206,7 +234,6 @@ with tab1:
             st.markdown("##### Chronomap")
             T1, T2, delta_values = chronomap_delta(A, M, t0)
             
-            # Adjusted figsize for alignment
             fig_cm, ax_cm = plt.subplots(figsize=(5, 5))
             style_plot(fig_cm, ax_cm)
             
@@ -215,9 +242,9 @@ with tab1:
             # Contour
             ax_cm.contour(T2, T1, delta_values, levels=[mu_abs], colors='black', linestyles='dotted', linewidths=1)
             
-            # t1 Line (Black Solid) - Horizontal
+            # t1 Line (Black Solid)
             ax_cm.axhline(t1_hour, color='black', ls='-', lw=2, label=f"t₁")
-            # t2 Line (Orange Dashed) - Vertical
+            # t2 Line (Orange Dashed)
             ax_cm.axvline(t2_hour, color='orange', ls='--', lw=2, label=f"t₂")
             
             # Intersection dot
@@ -225,7 +252,6 @@ with tab1:
             
             ax_cm.set_xlabel("Timepoint t₂ (h)"); ax_cm.set_ylabel("Timepoint t₁ (h)")
             ax_cm.set_xlim(0, 24); ax_cm.set_ylim(0, 24); ax_cm.set_aspect('equal')
-            # Legend
             ax_cm.legend(fontsize='x-small', loc='lower right', framealpha=0.8)
             st.pyplot(fig_cm)
             
@@ -237,18 +263,15 @@ with tab1:
             else: 
                 st.error(f"**Not comparable:** Δ = {abs(y_t1 - y_t2):.2f} (> {mu_abs:.2f})")
             
-            # Normalization for radial plot
+            # Normalization
             min_val, max_val = M - A, M + A
             norm = lambda y: 0.1 + 0.9 * np.clip((y - min_val) / (max_val - min_val), 0, 1)
             r1, r2 = norm(y_t1), norm(y_t2)
             
-            # Angles
             theta1 = (t1_hour / 24.0) * 2 * np.pi
             theta2 = (t2_hour / 24.0) * 2 * np.pi
             
-            # Plot
             fig_clk, ax_clk = plt.subplots(subplot_kw={'projection':'polar'}, figsize=(5, 5))
-            # Background style for polar is a bit different
             fig_clk.patch.set_facecolor(BG_COLOR)
             ax_clk.set_facecolor(BG_COLOR)
             ax_clk.spines['polar'].set_edgecolor('black')
@@ -301,30 +324,26 @@ with tab2:
             else:
                 df = pd.read_excel(file)
             
-            # Strip whitespace from headers
             df.columns = df.columns.str.strip().str.upper()
             
             if not {'VALUE', 'TIME'}.issubset(df.columns):
                 st.error(f"File {name} is missing required columns: VALUE, TIME")
                 return None
 
-            # 1. ANALYT Handling
+            # ANALYT
             if 'ANALYT' not in df.columns:
                 df['ANALYT'] = 'Unknown'
-            
-            # 2. DIM Handling
+            # DIM
             if 'DIM' not in df.columns:
                 df['DIM'] = ''
-
-            # 3. SEX Handling
+            # SEX
             if 'SEX' not in df.columns:
                 df['SEX'] = 'All' 
             else:
                 df['SEX'] = df['SEX'].astype(str).str.upper().map({
                     'M': 'Male', 'F': 'Female', 'D': 'Divers', 'MALE': 'Male', 'FEMALE': 'Female'
                 }).fillna('Other')
-            
-            # 4. AGE Handling
+            # AGE
             if 'AGE' not in df.columns:
                 df['AGE_GROUP'] = 'All'
             else:
@@ -332,7 +351,7 @@ with tab2:
                 df['AGE_GROUP'] = pd.cut(df['AGE'], bins=[0, 30, 50, 120], labels=["< 30", "30-50", "> 50"], right=False)
                 df['AGE_GROUP'] = df['AGE_GROUP'].cat.add_categories("Unknown").fillna("Unknown")
 
-            # 5. TIME Processing
+            # TIME
             df['TIMESTAMP'] = pd.to_datetime(df['TIME'], format='%d.%m.%Y %H:%M', errors='coerce')
             mask_nat = df['TIMESTAMP'].isna()
             if mask_nat.any():
@@ -358,12 +377,12 @@ with tab2:
         # --- FILTERS ---
         st.markdown("#### Data Filters")
         
-        # 1. Analyte Filter
+        # Analyte Filter
         analytes = sorted(df_all['ANALYT'].unique())
         sel_analyt = st.selectbox("Select Analyte", analytes)
         df_sub = df_all[df_all['ANALYT'] == sel_analyt].copy()
         
-        # 2. Grouping Filters
+        # Group Filters
         c_f1, c_f2 = st.columns(2)
         sex_opts = ["All"] + sorted([x for x in df_sub['SEX'].unique() if x != "All"])
         age_opts = ["All"] + sorted([str(x) for x in df_sub['AGE_GROUP'].unique() if str(x) != "All"])
@@ -371,7 +390,6 @@ with tab2:
         sel_sex = c_f1.selectbox("Filter Gender", sex_opts)
         sel_age = c_f2.selectbox("Filter Age Group", age_opts)
         
-        # Apply Filters
         if sel_sex != "All":
             df_sub = df_sub[df_sub['SEX'] == sel_sex]
         if sel_age != "All":
@@ -381,13 +399,12 @@ with tab2:
             st.warning("No data matches filters.")
         else:
             unit_display = df_sub['DIM'].iloc[0] if 'DIM' in df_sub.columns else ""
-            
             st.markdown(f"**Data Overview** ({len(df_sub)} samples) - Unit: {unit_display}")
             
             # --- BOXPLOT ---
             fig_box, ax_box = plt.subplots(figsize=(12, 5))
             style_plot(fig_box, ax_box)
-            ax_box.set_facecolor("white") # Boxplot looks better on white
+            ax_box.set_facecolor("white")
             
             colors = {'File 1': 'cornflowerblue', 'File 2': 'sandybrown'}
             df_sub['HOUR_INT'] = df_sub['TIMESTAMP'].dt.hour
