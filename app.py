@@ -12,7 +12,7 @@ import io
 st.set_page_config(layout="wide", page_title="Diurnal Fluctuations Analysis")
 
 # ───────────────────────────────────────────
-# CSS STYLING (FINAL DROPDOWN FIX)
+# CSS STYLING (FINAL FIX: Uploaded Files)
 # ───────────────────────────────────────────
 BG_COLOR = "#f0f2f6"     # Hellgrau (Hintergrund)
 TEXT_MAIN = "#000000"    # Schwarz (Labels, Überschriften)
@@ -43,7 +43,7 @@ st.markdown(f"""
     /* 3. WIDGET FIXES (Dunkle Boxen -> WEISSE Schrift)        */
     /* ------------------------------------------------------- */
 
-    /* A) SELECTBOX & TIMEINPUT (Geschlossener Zustand) */
+    /* A) SELECTBOX & TIMEINPUT */
     .stSelectbox div[data-baseweb="select"] div,
     .stTimeInput div[data-baseweb="select"] div {{
         color: {TEXT_WIDGET} !important;
@@ -53,34 +53,27 @@ st.markdown(f"""
         fill: {TEXT_WIDGET} !important;
     }}
 
-    /* B) DROPDOWN MENU (Das aufgeklappte Popover) - CRITICAL FIX */
-    
-    /* Hintergrund des Menüs dunkel machen */
+    /* B) DROPDOWN MENU (Popover) */
     div[data-baseweb="popover"] ul,
     div[data-baseweb="popover"] div {{
         background-color: #262730 !important;
     }}
-    
-    /* Den Text im Menü auf WEISS zwingen (überschreibt die schwarze Seite) */
     div[data-baseweb="popover"] li div,
     div[data-baseweb="popover"] li span,
     div[data-baseweb="popover"] li {{
         color: {TEXT_WIDGET} !important;
-        background-color: transparent !important; /* Damit Hover wirkt */
+        background-color: transparent !important;
     }}
-    
-    /* Hover-Effekt und Auswahl-Effekt (Rot) */
     div[data-baseweb="popover"] li:hover,
     div[data-baseweb="popover"] li[aria-selected="true"] {{
         background-color: #ff4b4b !important;
     }}
-    /* Sicherstellen, dass Text beim Hover weiß bleibt */
     div[data-baseweb="popover"] li:hover div,
     div[data-baseweb="popover"] li[aria-selected="true"] div {{
         color: {TEXT_WIDGET} !important;
     }}
 
-    /* C) ANDERE WIDGETS */
+    /* C) NUMBERS & BUTTONS */
     .stNumberInput input {{
         color: {TEXT_WIDGET} !important;
     }}
@@ -91,16 +84,34 @@ st.markdown(f"""
         color: {TEXT_WIDGET} !important;
     }}
 
-    /* D) FILE UPLOADER */
-    [data-testid="stFileUploader"] section div,
-    [data-testid="stFileUploader"] section span {{
+    /* D) FILE UPLOADER - DROPZONE (Dunkler Kasten -> Weißer Text) */
+    [data-testid="stFileUploader"] section > div, 
+    [data-testid="stFileUploader"] section > span {{
         color: {TEXT_WIDGET} !important;
     }}
-    [data-testid="stFileUploader"] small {{
-        color: #cccccc !important;
+    /* Der Browse Button */
+    [data-testid="stFileUploader"] button {{
+        color: {TEXT_WIDGET} !important;
     }}
 
-    /* 4. AUSNAHMEN (Schwarz lassen) */
+    /* E) FILE UPLOADER - HOCHGELADENE DATEI (Heller Hintergrund -> Schwarzer Text) */
+    [data-testid="stFileUploaderFile"] div,
+    [data-testid="stFileUploaderFile"] span,
+    [data-testid="stFileUploaderFile"] small {{
+        color: {TEXT_MAIN} !important; /* Zurück auf Schwarz zwingen */
+    }}
+    /* Das Datei-Icon und das Löschen-X müssen auch dunkel sein */
+    [data-testid="stFileUploaderFile"] svg {{
+        fill: {TEXT_MAIN} !important;
+        color: {TEXT_MAIN} !important;
+    }}
+    /* Der X-Button speziell */
+    [data-testid="stFileUploaderFile"] button {{
+        color: {TEXT_MAIN} !important;
+    }}
+
+
+    /* 4. AUSNAHMEN */
     .stRadio div[role='radiogroup'] label div {{
         color: {TEXT_MAIN} !important;
     }}
