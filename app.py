@@ -15,16 +15,23 @@ st.set_page_config(layout="wide", page_title="Circadian Analysis")
 # OPTIMIZED CSS
 st.markdown("""
     <style>
+    /* 1. Main Background color */
     .stApp { background-color: #f0f2f6; }
+    
+    /* 2. General Text Color */
     h1, h2, h3, h4, h5, h6, .stMarkdown, p, label, li {
         color: #1f1f1f !important;
         font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
     }
+    
+    /* 3. INPUT FIELDS (Dark BG, White Text) */
     div[data-baseweb="input"] {
         background-color: #4a4a4a !important; 
         border: 1px solid #666 !important;
     }
     input.st-ai, input.st-ah { color: #ffffff !important; }
+    
+    /* 4. DROPDOWNS (Selectbox) - CLOSED State */
     div[data-baseweb="select"] > div {
         background-color: #4a4a4a !important; 
         color: #ffffff !important;             
@@ -32,6 +39,27 @@ st.markdown("""
     }
     div[data-baseweb="select"] span { color: #ffffff !important; }
     div[data-baseweb="select"] svg { fill: #ffffff !important; }
+    
+    /* 5. DROPDOWNS - OPENED MENU (The List Options) */
+    /* Container of the list */
+    ul[data-baseweb="menu"] {
+        background-color: #4a4a4a !important;
+    }
+    /* The individual options (li) */
+    li[data-baseweb="option"] {
+        color: #ffffff !important;
+    }
+    /* Text inside the options (div/span) */
+    li[data-baseweb="option"] div, 
+    li[data-baseweb="option"] span {
+        color: #ffffff !important;
+    }
+    /* Hover state for options */
+    li[data-baseweb="option"]:hover {
+        background-color: #666666 !important;
+    }
+
+    /* 6. BUTTONS */
     .stDownloadButton > button, .stButton > button {
         color: #ffffff !important;
         background-color: #4a4a4a !important;
@@ -41,6 +69,8 @@ st.markdown("""
         border-color: #ff4b4b !important;
         color: #ffffff !important;
     }
+    
+    /* 7. Tabs styling */
     .stTabs [data-baseweb="tab-list"] { gap: 8px; }
     .stTabs [data-baseweb="tab"] {
         background-color: #ffffff;
@@ -54,6 +84,8 @@ st.markdown("""
         border-top: 3px solid #ff4b4b;
         font-weight: bold;
     }
+    
+    /* 8. Slider Text */
     div[data-testid="stThumbValue"] { color: #1f1f1f !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -113,47 +145,31 @@ def generate_template_csv():
 
 @st.cache_data
 def load_and_process_data(_file, file_identifier):
-    """
-    Extrem robuster Loader:
-    1. Sucht die Header-Zeile (falls Metadaten oben stehen).
-    2. Bereinigt Spaltennamen.
-    3. Sucht Synonyme für Spalten.
-    4. Bereinigt Daten.
-    """
     try:
         filename = _file.name.lower()
         
         # --- SCHRITT 1: HEADER FINDEN ---
-        # Wir lesen erst "roh" ohne Header ein, um zu sehen, wo die Daten beginnen.
         if filename.endswith('.xlsx') or filename.endswith('.xls'):
             df_raw = pd.read_excel(_file, header=None, nrows=20)
         else:
-            # CSV: Probiere verschiedene Encodings
             try:
                 df_raw = pd.read_csv(_file, sep=None, engine='python', header=None, nrows=20, encoding='utf-8-sig')
             except:
                 _file.seek(0)
                 df_raw = pd.read_csv(_file, sep=None, engine='python', header=None, nrows=20, encoding='latin1')
 
-        # Wir suchen eine Zeile, die Keywords wie "VALUE" oder "ANALYT" enthält
         header_row_idx = 0
-        found_header = False
-        
-        # Keywords, die auf eine Header-Zeile hindeuten (in Uppercase)
         header_keywords = ['VALUE', 'WERT', 'MESSWERT', 'RESULT', 'ANALYT', 'PARAMETER', 'TIME', 'DATUM']
         
         for idx, row in df_raw.iterrows():
-            # Zeile zu String, Uppercase
             row_str = " ".join(row.astype(str)).upper()
-            # Zählen wie viele Keywords in dieser Zeile vorkommen
             matches = sum(1 for kw in header_keywords if kw in row_str)
-            if matches >= 2: # Wenn mindestens 2 Keywords gefunden wurden (z.B. ANALYT und WERT)
+            if matches >= 2:
                 header_row_idx = idx
-                found_header = True
                 break
         
         # --- SCHRITT 2: ECHTES EINLESEN ---
-        _file.seek(0) # Zurück zum Anfang
+        _file.seek(0)
         if filename.endswith('.xlsx') or filename.endswith('.xls'):
             df = pd.read_excel(_file, header=header_row_idx)
         else:
@@ -164,15 +180,13 @@ def load_and_process_data(_file, file_identifier):
                 df = pd.read_csv(_file, sep=None, engine='python', header=header_row_idx, encoding='latin1')
 
         # --- SCHRITT 3: SPALTEN BEREINIGUNG ---
-        # Alles Uppercase, Leerzeichen weg, Sonderzeichen weg
         df.columns = df.columns.astype(str).str.strip().str.replace('"', '').str.replace("'", "").str.upper()
 
-        # Mapping Definieren
         column_candidates = {
             'value':     ['VALUE', 'WERT', 'ERGEBNIS', 'RESULT', 'MESSWERT', 'CONCENTRATION'],
             'timestamp': ['TIME', 'ZEIT', 'DATE', 'DATUM', 'ANALYSE_DATE', 'TIMESTAMP', 'PROBENNAHME'],
             'gender':    ['SEX', 'GENDER', 'GESCHLECHT'],
-            'age':       ['AGE', 'ALTER', 'JAHRE', 'GEBURTSDATUM'], # Geburtsdatum müsste man noch parsen, hier vereinfacht
+            'age':       ['AGE', 'ALTER', 'JAHRE', 'GEBURTSDATUM'],
             'analyte':   ['ANALYT', 'ANALYTE', 'PARAMETER', 'STOFF', 'TEST', 'BEZEICHNUNG'],
             'unit':      ['DIM', 'UNIT', 'EINHEIT', 'DIMENSION', 'MASSEINHEIT']
         }
@@ -180,17 +194,16 @@ def load_and_process_data(_file, file_identifier):
         found_mapping = {}
         existing_cols = list(df.columns)
         
-        # A) Exakte Synonym-Suche
+        # Exakte Suche
         for target, candidates in column_candidates.items():
             for candidate in candidates:
                 if candidate in existing_cols:
                     found_mapping[candidate] = target
                     break 
         
-        # B) Unscharfe Suche (Fuzzy): Falls exakt nicht gefunden, suche "enthält"
-        # Z.B. Spalte heißt "Analyt (Blut)" -> enthält "ANALYT"
+        # Unscharfe Suche
         for target, candidates in column_candidates.items():
-            if target not in found_mapping.values(): # Nur suchen wenn noch nicht gefunden
+            if target not in found_mapping.values():
                 for col in existing_cols:
                     for candidate in candidates:
                         if candidate in col and col not in found_mapping:
@@ -200,40 +213,33 @@ def load_and_process_data(_file, file_identifier):
 
         df.rename(columns=found_mapping, inplace=True)
         
-        # Check Critical Columns
         if 'value' not in df.columns or 'timestamp' not in df.columns:
             st.error(f"Error in '{file_identifier}': Konnte Spalten 'Value' oder 'Time' nicht finden. Gefunden: {existing_cols}")
             return None
 
         # --- SCHRITT 4: DATEN BEREINIGUNG ---
-        
-        # Value
         if df['value'].dtype == object:
             df['value'] = df['value'].astype(str).str.replace(',', '.', regex=False)
         df['value'] = pd.to_numeric(df['value'], errors='coerce')
         df.dropna(subset=['value'], inplace=True)
 
-        # Timestamp
         df['timestamp'] = pd.to_datetime(df['timestamp'], dayfirst=True, errors='coerce')
         df.dropna(subset=['timestamp'], inplace=True)
         df['hour_int'] = df['timestamp'].dt.hour
         
-        # Analyte - Hier werden wir sicherstellen, dass was drin steht
         if 'analyte' in df.columns:
             df['analyte'] = df['analyte'].astype(str).str.strip().str.title()
-            # Falls leere Strings drin sind, ersetzen
-            df['analyte'].replace(['', 'Nan', 'None'], 'Unknown Analyte', inplace=True)
+            df['analyte'].replace(['', 'Nan', 'None', 'Nan'], 'Unknown Analyte', inplace=True)
+            # Fillna explizit
+            df['analyte'] = df['analyte'].fillna('Unknown Analyte')
         else:
-            # Fallback: Spalte fehlt -> "Unknown Analyte"
             df['analyte'] = "Unknown Analyte"
 
-        # Alter
         if 'age' in df.columns:
             df['age'] = pd.to_numeric(df['age'], errors='coerce').fillna(35).astype(int)
         else:
             df['age'] = 35
             
-        # Geschlecht
         if 'gender' in df.columns:
             def clean_gender(x):
                 s = str(x).strip().upper()
@@ -245,7 +251,6 @@ def load_and_process_data(_file, file_identifier):
         else:
             df['gender'] = 'Other'
             
-        # Einheit
         if 'unit' in df.columns:
             df['unit'] = df['unit'].astype(str).str.strip()
         else:
@@ -419,16 +424,13 @@ with tab2:
         
         available_analytes = sorted(df_combined['analyte'].unique())
         
-        # -- Logic to hide Unknown Analyte if real ones exist --
+        # Smart Default selection
+        default_ix = 0 
         if len(available_analytes) > 1 and "Unknown Analyte" in available_analytes:
-             # If we have "Glucose" and "Unknown", default to Glucose
-             default_ix = 0 
              for i, a in enumerate(available_analytes):
                  if a != "Unknown Analyte":
                      default_ix = i
                      break
-        else:
-             default_ix = 0
 
         f_col1, f_col2, f_col3, f_col4 = st.columns(4)
         analyte_filter = f_col1.selectbox("Analyte", available_analytes, index=default_ix)
