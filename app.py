@@ -12,7 +12,7 @@ import io
 st.set_page_config(layout="wide", page_title="Diurnal Fluctuations Analysis")
 
 # ───────────────────────────────────────────
-# CSS STYLING (Complete)
+# CSS STYLING (FINAL DROPDOWN FIX)
 # ───────────────────────────────────────────
 BG_COLOR = "#f0f2f6"     # Hellgrau (Hintergrund)
 TEXT_MAIN = "#000000"    # Schwarz (Labels, Überschriften)
@@ -26,8 +26,8 @@ st.markdown(f"""
         color: {TEXT_MAIN};
     }}
     
-    /* 2. Standard-Text (Überschriften, Labels) -> SCHWARZ */
-    h1, h2, h3, h4, h5, h6, p, li, label {{
+    /* 2. Standard-Text auf der Seite -> SCHWARZ */
+    h1, h2, h3, h4, h5, h6, p, li, label, .stMarkdown {{
         color: {TEXT_MAIN} !important;
     }}
     
@@ -40,44 +40,50 @@ st.markdown(f"""
     }}
 
     /* ------------------------------------------------------- */
-    /* 3. WIDGET INHALTE (Dunkle Boxen -> WEISSE Schrift)      */
+    /* 3. WIDGET FIXES (Dunkle Boxen -> WEISSE Schrift)        */
     /* ------------------------------------------------------- */
 
-    /* A) Das GESCHLOSSENE Dropdown & TimeInput Feld */
-    div[data-baseweb="select"] > div {{
+    /* A) SELECTBOX & TIMEINPUT (Geschlossener Zustand) */
+    .stSelectbox div[data-baseweb="select"] div,
+    .stTimeInput div[data-baseweb="select"] div {{
         color: {TEXT_WIDGET} !important;
     }}
-    div[data-baseweb="select"] span {{
-        color: {TEXT_WIDGET} !important;
-    }}
-    /* Die Pfeil-Icons */
-    div[data-baseweb="select"] svg {{
+    .stSelectbox div[data-baseweb="select"] svg,
+    .stTimeInput div[data-baseweb="select"] svg {{
         fill: {TEXT_WIDGET} !important;
     }}
 
-    /* B) Das AUFGEKLAPPTE Dropdown-Menü (Popover Liste) */
-    /* Dies ist der kritische Teil für den Screenshot */
-    ul[data-baseweb="menu"] li {{
-        color: {TEXT_WIDGET} !important;
+    /* B) DROPDOWN MENU (Das aufgeklappte Popover) - CRITICAL FIX */
+    
+    /* Hintergrund des Menüs dunkel machen */
+    div[data-baseweb="popover"] ul,
+    div[data-baseweb="popover"] div {{
+        background-color: #262730 !important;
     }}
-    /* Text innerhalb der Listen-Elemente */
-    ul[data-baseweb="menu"] li div {{
+    
+    /* Den Text im Menü auf WEISS zwingen (überschreibt die schwarze Seite) */
+    div[data-baseweb="popover"] li div,
+    div[data-baseweb="popover"] li span,
+    div[data-baseweb="popover"] li {{
         color: {TEXT_WIDGET} !important;
+        background-color: transparent !important; /* Damit Hover wirkt */
     }}
-    /* Der Container der Liste selbst */
-    ul[data-baseweb="menu"] {{
-        background-color: #262730; /* Dunkler Hintergrund sicherstellen */
+    
+    /* Hover-Effekt und Auswahl-Effekt (Rot) */
+    div[data-baseweb="popover"] li:hover,
+    div[data-baseweb="popover"] li[aria-selected="true"] {{
+        background-color: #ff4b4b !important;
+    }}
+    /* Sicherstellen, dass Text beim Hover weiß bleibt */
+    div[data-baseweb="popover"] li:hover div,
+    div[data-baseweb="popover"] li[aria-selected="true"] div {{
+        color: {TEXT_WIDGET} !important;
     }}
 
-    /* C) ZAHLEN INPUT */
+    /* C) ANDERE WIDGETS */
     .stNumberInput input {{
         color: {TEXT_WIDGET} !important;
     }}
-    .stNumberInput button {{
-        color: {TEXT_WIDGET} !important;
-    }}
-
-    /* D) BUTTONS (Download & Browse) */
     button {{
         color: {TEXT_WIDGET} !important;
     }}
@@ -85,7 +91,7 @@ st.markdown(f"""
         color: {TEXT_WIDGET} !important;
     }}
 
-    /* E) FILE UPLOADER */
+    /* D) FILE UPLOADER */
     [data-testid="stFileUploader"] section div,
     [data-testid="stFileUploader"] section span {{
         color: {TEXT_WIDGET} !important;
@@ -94,26 +100,15 @@ st.markdown(f"""
         color: #cccccc !important;
     }}
 
-    /* ------------------------------------------------------- */
-    /* 4. AUSNAHMEN (Elemente, die schwarz bleiben müssen)     */
-    /* ------------------------------------------------------- */
-
-    /* Radio Buttons Optionen (schwarz auf grauem Hintergrund) */
+    /* 4. AUSNAHMEN (Schwarz lassen) */
     .stRadio div[role='radiogroup'] label div {{
         color: {TEXT_MAIN} !important;
     }}
-
-    /* Tabs Text */
     button[data-baseweb="tab"] {{
         color: {TEXT_MAIN} !important;
     }}
     button[data-baseweb="tab"][aria-selected="true"] {{
         color: #d10000 !important;
-    }}
-
-    /* Warnungen/Alerts */
-    .stAlert div {{
-        color: inherit; 
     }}
     </style>
     """, unsafe_allow_html=True)
