@@ -53,8 +53,19 @@ st.markdown("""
     div[data-baseweb="select"] svg {
         fill: #ffffff !important;
     }
+
+    /* 4. BUTTONS (Download & Normal) -> DARK BG / WHITE FONT */
+    .stDownloadButton > button, .stButton > button {
+        color: #ffffff !important;
+        background-color: #4a4a4a !important;
+        border: 1px solid #666 !important;
+    }
+    .stDownloadButton > button:hover, .stButton > button:hover {
+        border-color: #ff4b4b !important;
+        color: #ffffff !important;
+    }
     
-    /* 4. Tabs styling */
+    /* 5. Tabs styling */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
     }
@@ -71,7 +82,7 @@ st.markdown("""
         font-weight: bold;
     }
     
-    /* 5. Slider Text (Make sure numbers are visible) */
+    /* 6. Slider Text (Make sure numbers are visible) */
     div[data-testid="stThumbValue"] {
         color: #1f1f1f !important;
     }
