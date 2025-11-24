@@ -11,83 +11,106 @@ import io
 # ───────────────────────────────────────────
 st.set_page_config(layout="wide", page_title="Diurnal Fluctuations Analysis")
 
-# DEFINITIONEN FÜR FARBEN
-BG_COLOR = "#f0f2f6"     # Hellgrauer Hintergrund
-TEXT_COLOR = "#000000"   # Schwarzer Text für die Seite
-WIDGET_TEXT = "#ffffff"  # Weißer Text für Buttons/Inputs
+# ───────────────────────────────────────────
+# CSS STYLING (Fixed)
+# ───────────────────────────────────────────
+BG_COLOR = "#f0f2f6"     # Hellgrau (Hintergrund)
+TEXT_MAIN = "#000000"    # Schwarz (Labels, Überschriften)
+TEXT_WIDGET = "#ffffff"  # Weiß (Text IN den dunklen Boxen)
 
-# CSS FÜR STYLING
 st.markdown(f"""
     <style>
-    /* 1. Haupt-Hintergrund der App */
+    /* 1. Hintergrund der gesamten App */
     .stApp {{
         background-color: {BG_COLOR};
+        color: {TEXT_MAIN}; /* Standard Textfarbe schwarz */
     }}
     
-    /* 2. Genereller Text auf der Seite (Überschriften, Labels) -> SCHWARZ */
-    h1, h2, h3, h4, h5, h6, p, li, span, div {{
-        color: {TEXT_COLOR};
+    /* 2. Überschriften und Labels erzwingen wir auf SCHWARZ */
+    h1, h2, h3, h4, h5, h6, p, li, label {{
+        color: {TEXT_MAIN} !important;
     }}
     
-    /* Labels ÜBER den Inputs (z.B. "Analyte", "Upload File") -> SCHWARZ & FETT */
+    /* Labels über den Inputs spezifisch ansprechen */
     .stSelectbox label, .stNumberInput label, .stSlider label, 
     .stTimeInput label, .stRadio label, .stFileUploader label, 
     .stCheckbox label {{
-        color: {TEXT_COLOR} !important;
+        color: {TEXT_MAIN} !important;
         font-weight: 600;
     }}
 
-    /* 3. WIDGETS ANPASSEN (Dunkler Hintergrund -> Weißer Text) */
-    
-    /* DOWNLOAD BUTTON & Normale Buttons */
-    .stDownloadButton button, .stButton button {{
-        color: {WIDGET_TEXT} !important;
+    /* ------------------------------------------------------- */
+    /* 3. WIDGET INHALTE (Dunkle Boxen -> WEISSE Schrift)      */
+    /* ------------------------------------------------------- */
+
+    /* SELECTBOX & TIME INPUT (Das Innere der Box) */
+    /* Wir zielen auf das Element mit data-baseweb="select" und alle Kinder */
+    div[data-baseweb="select"] > div {{
+        color: {TEXT_WIDGET} !important;
     }}
-    
-    /* FILE UPLOADER (Drag & Drop Zone) */
-    /* Zwingt allen Text innerhalb der Dropzone auf Weiß */
-    [data-testid="stFileUploader"] section, 
-    [data-testid="stFileUploader"] div, 
-    [data-testid="stFileUploader"] span {{
-        color: {WIDGET_TEXT} !important;
+    /* Auch den Text (span/div) darin weiß machen */
+    div[data-baseweb="select"] span {{
+        color: {TEXT_WIDGET} !important;
     }}
-    
-    /* Das "Limit 200MB" Kleingedruckte etwas grauer, aber lesbar */
+    div[data-baseweb="select"] div {{
+        color: {TEXT_WIDGET} !important;
+    }}
+    /* Die Pfeile (SVG) weiß machen */
+    div[data-baseweb="select"] svg {{
+        fill: {TEXT_WIDGET} !important;
+    }}
+
+    /* ZAHLEN INPUT (Number Input) */
+    .stNumberInput input {{
+        color: {TEXT_WIDGET} !important;
+    }}
+    /* Die Plus/Minus Buttons daneben */
+    .stNumberInput button {{
+        color: {TEXT_WIDGET} !important;
+    }}
+
+    /* BUTTONS (Download & Browse Files) */
+    button {{
+        color: {TEXT_WIDGET} !important;
+    }}
+    /* Speziell für Download Button Text Container */
+    .stDownloadButton button p {{
+        color: {TEXT_WIDGET} !important;
+    }}
+
+    /* FILE UPLOADER (Drag & Drop Zone Text) */
+    [data-testid="stFileUploader"] section div {{
+        color: {TEXT_WIDGET} !important;
+    }}
+    [data-testid="stFileUploader"] section span {{
+        color: {TEXT_WIDGET} !important;
+    }}
+    /* Das "Limit 200MB" Kleingedruckte etwas heller grau */
     [data-testid="stFileUploader"] small {{
-        color: #e0e0e0 !important;
+        color: #cccccc !important;
     }}
 
-    /* Der "Browse files" Button innerhalb des Uploaders */
-    [data-testid="stFileUploader"] button {{
-        color: {WIDGET_TEXT} !important;
-    }}
+    /* ------------------------------------------------------- */
+    /* 4. AUSNAHMEN WIEDERHERSTELLEN                           */
+    /* ------------------------------------------------------- */
 
-    /* INPUT FELDER (Zahlen, Zeit) - Text innen weiß, falls Box dunkel ist */
-    .stNumberInput input, .stTimeInput input {{
-        color: {WIDGET_TEXT} !important;
-    }}
-    
-    /* SELECTBOX Text des ausgewählten Elements */
-    .stSelectbox div[data-baseweb="select"] span {{
-        color: {WIDGET_TEXT} !important;
-    }}
-    
-    /* RADIO BUTTONS Text */
+    /* Radio Buttons Optionen Text (muss schwarz sein auf grauem Grund) */
     .stRadio div[role='radiogroup'] label div {{
-        color: {TEXT_COLOR} !important;
+        color: {TEXT_MAIN} !important;
     }}
 
-    /* TABS Styling */
+    /* Tabs Text (inaktiv schwarz) */
     button[data-baseweb="tab"] {{
-        color: {TEXT_COLOR} !important;
+        color: {TEXT_MAIN} !important;
     }}
+    /* Tabs Text (aktiv rot/hervorgehoben) */
     button[data-baseweb="tab"][aria-selected="true"] {{
-        color: #d10000 !important; /* Aktiver Tab rot */
+        color: #d10000 !important;
     }}
 
-    /* Warnungen/Infos lesbar machen (Hintergrund ist meist hell in st.info) */
+    /* Expander/Alert Texte */
     .stAlert div {{
-        color: {TEXT_COLOR} !important;
+        color: inherit; 
     }}
     </style>
     """, unsafe_allow_html=True)
@@ -211,7 +234,7 @@ with tab1:
         # --- Plot 1: Time Series ---
         fig_sin, ax_sin = plt.subplots(figsize=(10, 3.5))
         style_plot(fig_sin, ax_sin)
-        ax_sin.set_facecolor("white") # Keep graph area white for contrast
+        ax_sin.set_facecolor("white")
         
         ax_sin.set_title(f"Simulated Diurnal Fluctuation for {analyte}", fontsize=12, color='black')
         ax_sin.plot(t_arr, y_arr_display, color="cornflowerblue", label="Expected Profile", lw=3)
