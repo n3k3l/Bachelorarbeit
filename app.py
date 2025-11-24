@@ -24,14 +24,14 @@ st.markdown("""
         font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
     }
     
-    /* 3. INPUT FIELDS (Dark BG, White Text) */
+    /* 3. INPUT FIELDS (Closed State) */
     div[data-baseweb="input"] {
         background-color: #4a4a4a !important; 
         border: 1px solid #666 !important;
     }
     input.st-ai, input.st-ah { color: #ffffff !important; }
     
-    /* 4. DROPDOWNS (Selectbox) - CLOSED State */
+    /* 4. DROPDOWNS (Selectbox - Closed State) */
     div[data-baseweb="select"] > div {
         background-color: #4a4a4a !important; 
         color: #ffffff !important;             
@@ -40,22 +40,31 @@ st.markdown("""
     div[data-baseweb="select"] span { color: #ffffff !important; }
     div[data-baseweb="select"] svg { fill: #ffffff !important; }
     
-    /* 5. DROPDOWNS - OPENED MENU (The List Options) */
-    /* Container of the list */
+    /* 5. DROPDOWNS - POPUP MENU (The Critical Part) */
+    
+    /* Background of the dropdown list container */
+    div[data-baseweb="popover"] > div,
     ul[data-baseweb="menu"] {
         background-color: #4a4a4a !important;
     }
-    /* The individual options (li) */
-    li[data-baseweb="option"] {
+    
+    /* The List Item (Option) itself */
+    li[data-baseweb="option"], 
+    li[role="option"] {
+        background-color: #4a4a4a !important;
         color: #ffffff !important;
     }
-    /* Text inside the options (div/span) */
-    li[data-baseweb="option"] div, 
-    li[data-baseweb="option"] span {
+    
+    /* FORCE ALL TEXT INSIDE THE OPTION TO BE WHITE */
+    /* This overrides any internal Streamlit dark text settings */
+    li[data-baseweb="option"] *, 
+    li[role="option"] * {
         color: #ffffff !important;
     }
-    /* Hover state for options */
-    li[data-baseweb="option"]:hover {
+    
+    /* Hover State for Options */
+    li[data-baseweb="option"]:hover, 
+    li[role="option"]:hover {
         background-color: #666666 !important;
     }
 
@@ -148,7 +157,7 @@ def load_and_process_data(_file, file_identifier):
     try:
         filename = _file.name.lower()
         
-        # --- SCHRITT 1: HEADER FINDEN ---
+        # HEADER FINDEN
         if filename.endswith('.xlsx') or filename.endswith('.xls'):
             df_raw = pd.read_excel(_file, header=None, nrows=20)
         else:
@@ -168,7 +177,7 @@ def load_and_process_data(_file, file_identifier):
                 header_row_idx = idx
                 break
         
-        # --- SCHRITT 2: ECHTES EINLESEN ---
+        # ECHTES EINLESEN
         _file.seek(0)
         if filename.endswith('.xlsx') or filename.endswith('.xls'):
             df = pd.read_excel(_file, header=header_row_idx)
@@ -179,7 +188,7 @@ def load_and_process_data(_file, file_identifier):
                 _file.seek(0)
                 df = pd.read_csv(_file, sep=None, engine='python', header=header_row_idx, encoding='latin1')
 
-        # --- SCHRITT 3: SPALTEN BEREINIGUNG ---
+        # SPALTEN BEREINIGUNG
         df.columns = df.columns.astype(str).str.strip().str.replace('"', '').str.replace("'", "").str.upper()
 
         column_candidates = {
@@ -194,14 +203,12 @@ def load_and_process_data(_file, file_identifier):
         found_mapping = {}
         existing_cols = list(df.columns)
         
-        # Exakte Suche
         for target, candidates in column_candidates.items():
             for candidate in candidates:
                 if candidate in existing_cols:
                     found_mapping[candidate] = target
                     break 
         
-        # Unscharfe Suche
         for target, candidates in column_candidates.items():
             if target not in found_mapping.values():
                 for col in existing_cols:
@@ -217,7 +224,7 @@ def load_and_process_data(_file, file_identifier):
             st.error(f"Error in '{file_identifier}': Konnte Spalten 'Value' oder 'Time' nicht finden. Gefunden: {existing_cols}")
             return None
 
-        # --- SCHRITT 4: DATEN BEREINIGUNG ---
+        # DATEN BEREINIGUNG
         if df['value'].dtype == object:
             df['value'] = df['value'].astype(str).str.replace(',', '.', regex=False)
         df['value'] = pd.to_numeric(df['value'], errors='coerce')
@@ -230,7 +237,6 @@ def load_and_process_data(_file, file_identifier):
         if 'analyte' in df.columns:
             df['analyte'] = df['analyte'].astype(str).str.strip().str.title()
             df['analyte'].replace(['', 'Nan', 'None', 'Nan'], 'Unknown Analyte', inplace=True)
-            # Fillna explizit
             df['analyte'] = df['analyte'].fillna('Unknown Analyte')
         else:
             df['analyte'] = "Unknown Analyte"
@@ -424,7 +430,6 @@ with tab2:
         
         available_analytes = sorted(df_combined['analyte'].unique())
         
-        # Smart Default selection
         default_ix = 0 
         if len(available_analytes) > 1 and "Unknown Analyte" in available_analytes:
              for i, a in enumerate(available_analytes):
