@@ -15,23 +15,23 @@ st.set_page_config(layout="wide", page_title="Circadian Analysis")
 # OPTIMIZED CSS
 st.markdown("""
     <style>
-    /* 1. Main Background color */
+    /* 1. Main Background */
     .stApp { background-color: #f0f2f6; }
     
-    /* 2. General Text Color */
-    h1, h2, h3, h4, h5, h6, .stMarkdown, p, label, li {
+    /* 2. Text Color */
+    h1, h2, h3, h4, h5, h6, .stMarkdown, p, label, li, span {
         color: #1f1f1f !important;
         font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
     }
     
-    /* 3. INPUT FIELDS (Closed State) */
+    /* 3. INPUT FIELDS */
     div[data-baseweb="input"] {
         background-color: #4a4a4a !important; 
         border: 1px solid #666 !important;
     }
     input.st-ai, input.st-ah { color: #ffffff !important; }
     
-    /* 4. DROPDOWNS (Selectbox - Closed State) */
+    /* 4. DROPDOWNS & SELECTBOXES */
     div[data-baseweb="select"] > div {
         background-color: #4a4a4a !important; 
         color: #ffffff !important;             
@@ -40,35 +40,23 @@ st.markdown("""
     div[data-baseweb="select"] span { color: #ffffff !important; }
     div[data-baseweb="select"] svg { fill: #ffffff !important; }
     
-    /* 5. DROPDOWNS - POPUP MENU (The Critical Part) */
-    
-    /* Background of the dropdown list container */
-    div[data-baseweb="popover"] > div,
-    ul[data-baseweb="menu"] {
+    /* POPUP MENU (The List Options) */
+    div[data-baseweb="popover"] > div, ul[data-baseweb="menu"] {
         background-color: #4a4a4a !important;
     }
-    
-    /* The List Item (Option) itself */
-    li[data-baseweb="option"], 
-    li[role="option"] {
+    li[data-baseweb="option"] {
         background-color: #4a4a4a !important;
         color: #ffffff !important;
     }
-    
-    /* FORCE ALL TEXT INSIDE THE OPTION TO BE WHITE */
-    /* This overrides any internal Streamlit dark text settings */
-    li[data-baseweb="option"] *, 
-    li[role="option"] * {
+    /* Force white text inside options */
+    li[data-baseweb="option"] *, li[role="option"] * {
         color: #ffffff !important;
     }
-    
-    /* Hover State for Options */
-    li[data-baseweb="option"]:hover, 
-    li[role="option"]:hover {
+    li[data-baseweb="option"]:hover {
         background-color: #666666 !important;
     }
 
-    /* 6. BUTTONS */
+    /* 5. BUTTONS */
     .stDownloadButton > button, .stButton > button {
         color: #ffffff !important;
         background-color: #4a4a4a !important;
@@ -79,7 +67,7 @@ st.markdown("""
         color: #ffffff !important;
     }
     
-    /* 7. Tabs styling */
+    /* 6. Tabs */
     .stTabs [data-baseweb="tab-list"] { gap: 8px; }
     .stTabs [data-baseweb="tab"] {
         background-color: #ffffff;
@@ -94,7 +82,6 @@ st.markdown("""
         font-weight: bold;
     }
     
-    /* 8. Slider Text */
     div[data-testid="stThumbValue"] { color: #1f1f1f !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -141,12 +128,13 @@ def chronomap_delta(A, M, t0, steps=100):
 
 @st.cache_data
 def generate_template_csv():
+    # Matches the Paper Description exactly
     data = {
         'ANALYT': ['Cholesterin', 'Glucose', 'Cortisol', 'Glucose', 'Glucose'],
         'VALUE': [167.0, 95.0, 14.5, 5.2, 105.0],
         'DIM': ['mg/dl', 'mg/dl', 'ug/dl', 'mmol/l', 'mg/dl'],
         'TIME': ['27.11.2013 16:06', '27.11.2013 08:30', '27.11.2013 20:00', '28.11.2013 09:15', '28.11.2013 14:00'],
-        'SEX': ['M', 'F', 'M', 'F', 'M'],
+        'SEX': ['M', 'F', 'M', 'F', 'D'], # Added 'D' for Divers/Example
         'AGE': [47, 32, 55, 29, 60]
     }
     df = pd.DataFrame(data)
@@ -154,10 +142,13 @@ def generate_template_csv():
 
 @st.cache_data
 def load_and_process_data(_file, file_identifier):
+    """
+    Robust Loader that respects the optional nature of AGE and SEX.
+    """
     try:
         filename = _file.name.lower()
         
-        # HEADER FINDEN
+        # 1. Header Detection
         if filename.endswith('.xlsx') or filename.endswith('.xls'):
             df_raw = pd.read_excel(_file, header=None, nrows=20)
         else:
@@ -168,7 +159,7 @@ def load_and_process_data(_file, file_identifier):
                 df_raw = pd.read_csv(_file, sep=None, engine='python', header=None, nrows=20, encoding='latin1')
 
         header_row_idx = 0
-        header_keywords = ['VALUE', 'WERT', 'MESSWERT', 'RESULT', 'ANALYT', 'PARAMETER', 'TIME', 'DATUM']
+        header_keywords = ['VALUE', 'WERT', 'RESULT', 'ANALYT', 'TIME', 'DATUM']
         
         for idx, row in df_raw.iterrows():
             row_str = " ".join(row.astype(str)).upper()
@@ -177,7 +168,7 @@ def load_and_process_data(_file, file_identifier):
                 header_row_idx = idx
                 break
         
-        # ECHTES EINLESEN
+        # 2. Real Load
         _file.seek(0)
         if filename.endswith('.xlsx') or filename.endswith('.xls'):
             df = pd.read_excel(_file, header=header_row_idx)
@@ -188,27 +179,29 @@ def load_and_process_data(_file, file_identifier):
                 _file.seek(0)
                 df = pd.read_csv(_file, sep=None, engine='python', header=header_row_idx, encoding='latin1')
 
-        # SPALTEN BEREINIGUNG
+        # 3. Column Cleanup & Mapping
         df.columns = df.columns.astype(str).str.strip().str.replace('"', '').str.replace("'", "").str.upper()
 
         column_candidates = {
-            'value':     ['VALUE', 'WERT', 'ERGEBNIS', 'RESULT', 'MESSWERT', 'CONCENTRATION'],
-            'timestamp': ['TIME', 'ZEIT', 'DATE', 'DATUM', 'ANALYSE_DATE', 'TIMESTAMP', 'PROBENNAHME'],
-            'gender':    ['SEX', 'GENDER', 'GESCHLECHT'],
-            'age':       ['AGE', 'ALTER', 'JAHRE', 'GEBURTSDATUM'],
-            'analyte':   ['ANALYT', 'ANALYTE', 'PARAMETER', 'STOFF', 'TEST', 'BEZEICHNUNG'],
-            'unit':      ['DIM', 'UNIT', 'EINHEIT', 'DIMENSION', 'MASSEINHEIT']
+            'value':     ['VALUE', 'WERT', 'MESSWERT', 'CONCENTRATION'],
+            'timestamp': ['TIME', 'ZEIT', 'DATE', 'DATUM', 'ANALYSE_DATE', 'TIMESTAMP'],
+            'gender':    ['SEX', 'GENDER', 'GESCHLECHT'], # Optional
+            'age':       ['AGE', 'ALTER', 'JAHRE'],       # Optional
+            'analyte':   ['ANALYT', 'ANALYTE', 'PARAMETER', 'STOFF'],
+            'unit':      ['DIM', 'UNIT', 'EINHEIT', 'DIMENSION']
         }
         
         found_mapping = {}
         existing_cols = list(df.columns)
         
+        # Exact match
         for target, candidates in column_candidates.items():
             for candidate in candidates:
                 if candidate in existing_cols:
                     found_mapping[candidate] = target
                     break 
         
+        # Fuzzy match
         for target, candidates in column_candidates.items():
             if target not in found_mapping.values():
                 for col in existing_cols:
@@ -220,20 +213,25 @@ def load_and_process_data(_file, file_identifier):
 
         df.rename(columns=found_mapping, inplace=True)
         
+        # Check Mandatory Columns
         if 'value' not in df.columns or 'timestamp' not in df.columns:
-            st.error(f"Error in '{file_identifier}': Konnte Spalten 'Value' oder 'Time' nicht finden. Gefunden: {existing_cols}")
+            st.error(f"Error in '{file_identifier}': Mandatory columns 'VALUE' or 'TIME' missing. Found: {existing_cols}")
             return None
 
-        # DATEN BEREINIGUNG
+        # --- DATA CLEANING ---
+        
+        # Value
         if df['value'].dtype == object:
             df['value'] = df['value'].astype(str).str.replace(',', '.', regex=False)
         df['value'] = pd.to_numeric(df['value'], errors='coerce')
         df.dropna(subset=['value'], inplace=True)
 
+        # Timestamp
         df['timestamp'] = pd.to_datetime(df['timestamp'], dayfirst=True, errors='coerce')
         df.dropna(subset=['timestamp'], inplace=True)
         df['hour_int'] = df['timestamp'].dt.hour
         
+        # Analyte
         if 'analyte' in df.columns:
             df['analyte'] = df['analyte'].astype(str).str.strip().str.title()
             df['analyte'].replace(['', 'Nan', 'None', 'Nan'], 'Unknown Analyte', inplace=True)
@@ -241,28 +239,43 @@ def load_and_process_data(_file, file_identifier):
         else:
             df['analyte'] = "Unknown Analyte"
 
+        # --- OPTIONAL COLUMNS LOGIC ---
+        
+        # Age
         if 'age' in df.columns:
-            df['age'] = pd.to_numeric(df['age'], errors='coerce').fillna(35).astype(int)
+            df['age'] = pd.to_numeric(df['age'], errors='coerce') # Can be NaN
+            df['has_age'] = True
         else:
-            df['age'] = 35
+            df['age'] = np.nan
+            df['has_age'] = False
             
+        # Gender
         if 'gender' in df.columns:
             def clean_gender(x):
                 s = str(x).strip().upper()
-                if not s or s == 'NAN': return 'Other'
+                if not s or s == 'NAN': return 'Not Specified'
                 if s.startswith('M') or s.startswith('H'): return 'Male'
                 if s.startswith('F') or s.startswith('W'): return 'Female'
-                return 'Other'
+                if s.startswith('D'): return 'Divers' # Added support for Divers
+                return 'Not Specified'
             df['gender'] = df['gender'].apply(clean_gender)
+            df['has_gender'] = True
         else:
-            df['gender'] = 'Other'
+            df['gender'] = 'Not Specified'
+            df['has_gender'] = False
             
+        # Unit
         if 'unit' in df.columns:
             df['unit'] = df['unit'].astype(str).str.strip()
         else:
             df['unit'] = 'units'
-            
+        
+        # Age Grouping (Handle missing age)
+        # We use a special label for missing age
         df['age_group'] = pd.cut(df['age'], bins=[0, 30, 50, 120], labels=["< 30 years", "30-50 years", "> 50 years"], right=False)
+        df['age_group'] = df['age_group'].cat.add_categories(["No Age Data"])
+        df['age_group'] = df['age_group'].fillna("No Age Data")
+        
         df['source_file'] = file_identifier
         
         return df
@@ -450,13 +463,19 @@ with tab2:
         else:
             current_unit = "units"
         
+        # --- CHECK IF AGE/GENDER AVAILABLE ---
+        # If columns were missing in file, they are marked as has_age=False
+        has_gender = df_analyte['has_gender'].any()
+        has_age = df_analyte['has_age'].any()
+
         gender_opts = ["All"] + sorted(df_analyte['gender'].unique())
-        age_opts = ["All"] + list(df_analyte['age_group'].dropna().unique())
+        age_opts = ["All"] + list(df_analyte['age_group'].unique().dropna())
         source_opts = sorted(df_analyte['source_file'].unique())
         display_opts = ["Combined"] + source_opts if len(source_opts) > 1 else source_opts
         
-        gender_filter = f_col2.selectbox("Gender", gender_opts)
-        age_filter = f_col3.selectbox("Age Group", age_opts)
+        # Disable dropdowns if data is missing
+        gender_filter = f_col2.selectbox("Gender", gender_opts, disabled=not has_gender)
+        age_filter = f_col3.selectbox("Age Group", age_opts, disabled=not has_age)
         display_mode = f_col4.radio("Display Source", display_opts, horizontal=True)
 
         df_plot = df_analyte.copy()
@@ -496,6 +515,7 @@ with tab2:
         st.markdown("### 3. Model Parameters")
         results = []
         df_fit_base = df_analyte if display_mode == "Combined" else df_analyte[df_analyte['source_file'] == display_mode]
+        
         genders = sorted(df_fit_base['gender'].unique())
         if 'age_group' in df_fit_base.columns:
             ages = sorted(df_fit_base['age_group'].unique().dropna())
@@ -504,7 +524,8 @@ with tab2:
         
         if genders and ages:
             rows, cols = len(ages), len(genders)
-            fig_grid, axes = plt.subplots(rows, cols, figsize=(5*cols, 3*rows), 
+            # Ensure at least 1 row/col even if it's "Not Specified"
+            fig_grid, axes = plt.subplots(rows, cols, figsize=(max(5, 5*cols), max(3, 3*rows)), 
                                           sharex=True, sharey=True, squeeze=False, facecolor='white')
             
             for i, ag in enumerate(ages):
