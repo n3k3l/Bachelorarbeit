@@ -92,14 +92,32 @@ st.markdown("""
     div[role="tabpanel"]:nth-of-type(2) .stDownloadButton,
     div[role="tabpanel"]:nth-of-type(2) div[data-baseweb="select"] > div,
     div[role="tabpanel"]:nth-of-type(2) div[data-baseweb="popover"] > div,
-    div[role="tabpanel"]:nth-of-type(2) li[data-baseweb="option"] {
+    div[role="tabpanel"]:nth-of-type(2) li[data-baseweb="option"],
+    div[role="tabpanel"]:nth-of-type(2) .stFileUploader,
+    div[role="tabpanel"]:nth-of-type(2) .stFileUploader label,
+    div[role="tabpanel"]:nth-of-type(2) .stFileUploader span,
+    div[role="tabpanel"]:nth-of-type(2) .stFileUploader svg {
         color: #ffffff !important;
+        fill: #ffffff !important;
     }
     /* Make sure button backgrounds remain dark but text is white */
     div[role="tabpanel"]:nth-of-type(2) .stDownloadButton > button,
-    div[role="tabpanel"]:nth-of-type(2) .stButton > button {
+    div[role="tabpanel"]:nth-of-type(2) .stButton > button,
+    div[role="tabpanel"]:nth-of-type(2) .stFileUploader {
         background-color: #333333 !important;
         border-color: #555555 !important;
+    }
+    /* FileUploader dropzone background and text */
+    div[role="tabpanel"]:nth-of-type(2) .stFileUploader [data-testid="stFileDropzone"] {
+        background-color: #333333 !important;
+        color: #ffffff !important;
+        border: 1.5px solid #555555 !important;
+    }
+    div[role="tabpanel"]:nth-of-type(2) .stFileUploader [data-testid="stFileDropzone"] svg {
+        fill: #ffffff !important;
+    }
+    div[role="tabpanel"]:nth-of-type(2) .stFileUploader [data-testid="stFileDropzone"] span {
+        color: #ffffff !important;
     }
 
     </style>
