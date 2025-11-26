@@ -83,6 +83,25 @@ st.markdown("""
     }
     
     div[data-testid="stThumbValue"] { color: #1f1f1f !important; }
+
+    /* 7. Ensure readable controls inside the SECOND tab (tab index 2) */
+    /* Targets tabpanel #2 and forces buttons and key controls to white text */
+    div[role="tabpanel"]:nth-of-type(2) .stDownloadButton > button,
+    div[role="tabpanel"]:nth-of-type(2) .stButton > button,
+    div[role="tabpanel"]:nth-of-type(2) .stButton,
+    div[role="tabpanel"]:nth-of-type(2) .stDownloadButton,
+    div[role="tabpanel"]:nth-of-type(2) div[data-baseweb="select"] > div,
+    div[role="tabpanel"]:nth-of-type(2) div[data-baseweb="popover"] > div,
+    div[role="tabpanel"]:nth-of-type(2) li[data-baseweb="option"] {
+        color: #ffffff !important;
+    }
+    /* Make sure button backgrounds remain dark but text is white */
+    div[role="tabpanel"]:nth-of-type(2) .stDownloadButton > button,
+    div[role="tabpanel"]:nth-of-type(2) .stButton > button {
+        background-color: #333333 !important;
+        border-color: #555555 !important;
+    }
+
     </style>
 """, unsafe_allow_html=True)
 
