@@ -12,62 +12,79 @@ from io import BytesIO
 # ───────────────────────────────────────────
 st.set_page_config(layout="wide", page_title="Circadian Analysis")
 
-# OPTIMIZED CSS
+# OPTIMIZED CSS - FIX FOR WHITE TEXT ON DARK BACKGROUND
 st.markdown("""
     <style>
     /* 1. Main Background */
     .stApp { background-color: #f0f2f6; }
     
-    /* 2. Text Color */
+    /* 2. Global Text Color (for light background areas) */
     h1, h2, h3, h4, h5, h6, .stMarkdown, p, label, li, span {
-        color: #1f1f1f !important;
+        color: #1f1f1f;
         font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
     }
     
-    /* 3. INPUT FIELDS */
+    /* 3. INPUT FIELDS (Number Input, Text Input) */
     div[data-baseweb="input"] {
         background-color: #4a4a4a !important; 
         border: 1px solid #666 !important;
     }
-    input.st-ai, input.st-ah { color: #ffffff !important; }
+    /* WICHTIG: Text innerhalb des Inputs weiß machen */
+    div[data-baseweb="input"] input {
+        color: #ffffff !important;
+        caret-color: #ffffff !important; /* Cursor weiß */
+    }
     
     /* 4. DROPDOWNS & SELECTBOXES */
+    /* Der Container der Auswahlbox */
     div[data-baseweb="select"] > div {
         background-color: #4a4a4a !important; 
-        color: #ffffff !important;             
         border: 1px solid #666 !important;
+        color: #ffffff !important;
     }
-    div[data-baseweb="select"] span { color: #ffffff !important; }
-    div[data-baseweb="select"] svg { fill: #ffffff !important; }
+    /* Der Text des ausgewählten Elements */
+    div[data-baseweb="select"] div[class*="content"] {
+        color: #ffffff !important;
+    }
+    /* Alle Icons (Pfeile) weiß färben */
+    div[data-baseweb="select"] svg { 
+        fill: #ffffff !important; 
+    }
     
-    /* POPUP MENU (The List Options) */
-    div[data-baseweb="popover"] > div, ul[data-baseweb="menu"] {
+    /* POPUP MENU (Die Liste der Optionen beim Ausklappen) */
+    div[data-baseweb="popover"], div[data-baseweb="menu"], ul[data-baseweb="menu"] {
         background-color: #4a4a4a !important;
     }
+    /* Einzelne Optionen in der Liste */
     li[data-baseweb="option"] {
         background-color: #4a4a4a !important;
         color: #ffffff !important;
     }
-    /* Force white text inside options */
-    li[data-baseweb="option"] *, li[role="option"] * {
+    /* Text innerhalb der Option */
+    li[data-baseweb="option"] * {
         color: #ffffff !important;
     }
-    li[data-baseweb="option"]:hover {
+    /* Hover Effekt */
+    li[data-baseweb="option"]:hover, li[aria-selected="true"] {
         background-color: #666666 !important;
     }
 
-    /* 5. BUTTONS */
-    .stDownloadButton > button, .stButton > button {
+    /* 5. BUTTONS (Normal & Download) */
+    .stButton > button, .stDownloadButton > button {
         color: #ffffff !important;
         background-color: #4a4a4a !important;
         border: 1px solid #666 !important;
     }
-    .stDownloadButton > button:hover, .stButton > button:hover {
+    .stButton > button:hover, .stDownloadButton > button:hover {
         border-color: #ff4b4b !important;
         color: #ffffff !important;
+        background-color: #555555 !important;
     }
-    
-    /* 6. Tabs */
+    .stButton > button p {
+        color: #ffffff !important; /* Erzwingt weiße Schrift im Button */
+    }
+
+    /* 6. Tabs Styling */
     .stTabs [data-baseweb="tab-list"] { gap: 8px; }
     .stTabs [data-baseweb="tab"] {
         background-color: #ffffff;
@@ -82,42 +99,16 @@ st.markdown("""
         font-weight: bold;
     }
     
+    /* 7. Slider Labels & Values */
     div[data-testid="stThumbValue"] { color: #1f1f1f !important; }
-
-    /* 7. Ensure readable controls inside the SECOND tab (tab index 2) */
-    /* Targets tabpanel #2 and forces buttons and key controls to white text */
-    div[role="tabpanel"]:nth-of-type(2) .stDownloadButton > button,
-    div[role="tabpanel"]:nth-of-type(2) .stButton > button,
-    div[role="tabpanel"]:nth-of-type(2) .stButton,
-    div[role="tabpanel"]:nth-of-type(2) .stDownloadButton,
-    div[role="tabpanel"]:nth-of-type(2) div[data-baseweb="select"] > div,
-    div[role="tabpanel"]:nth-of-type(2) div[data-baseweb="popover"] > div,
-    div[role="tabpanel"]:nth-of-type(2) li[data-baseweb="option"],
-    div[role="tabpanel"]:nth-of-type(2) .stFileUploader,
-    div[role="tabpanel"]:nth-of-type(2) .stFileUploader label,
-    div[role="tabpanel"]:nth-of-type(2) .stFileUploader span,
-    div[role="tabpanel"]:nth-of-type(2) .stFileUploader svg {
+    
+    /* 8. Fix für Time Input und Number Input +/- Buttons */
+    button[kind="secondary"] {
         color: #ffffff !important;
+    }
+    /* Icons in Number Inputs (+/-) */
+    div[data-baseweb="input"] button svg {
         fill: #ffffff !important;
-    }
-    /* Make sure button backgrounds remain dark but text is white */
-    div[role="tabpanel"]:nth-of-type(2) .stDownloadButton > button,
-    div[role="tabpanel"]:nth-of-type(2) .stButton > button,
-    div[role="tabpanel"]:nth-of-type(2) .stFileUploader {
-        background-color: #333333 !important;
-        border-color: #555555 !important;
-    }
-    /* FileUploader dropzone background and text */
-    div[role="tabpanel"]:nth-of-type(2) .stFileUploader [data-testid="stFileDropzone"] {
-        background-color: #333333 !important;
-        color: #ffffff !important;
-        border: 1.5px solid #555555 !important;
-    }
-    div[role="tabpanel"]:nth-of-type(2) .stFileUploader [data-testid="stFileDropzone"] svg {
-        fill: #ffffff !important;
-    }
-    div[role="tabpanel"]:nth-of-type(2) .stFileUploader [data-testid="stFileDropzone"] span {
-        color: #ffffff !important;
     }
 
     </style>
