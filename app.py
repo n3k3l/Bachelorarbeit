@@ -71,12 +71,20 @@ st.markdown("""
 
     /* Ziel: ALLE Textelemente innerhalb der Buttons (p, div, span) */
     div[data-testid="stButton"] > button *, 
-    div[data-testid="stDownloadButton"] > button * {
+    div[data-testid="stDownloadButton"] > button *,
+    div[data-testid="stButton"] > button p,
+    div[data-testid="stDownloadButton"] > button p,
+    div[data-testid="stButton"] > button span,
+    div[data-testid="stDownloadButton"] > button span,
+    div[data-testid="stButton"] > button div,
+    div[data-testid="stDownloadButton"] > button div {
         color: #ffffff !important;
     }
     
-    /* Ziel: Speziell das <p> Tag im Download Button (der Übeltäter) */
-    div[data-testid="stDownloadButton"] > button p {
+    /* Extra specific targeting for download button label */
+    div[data-testid="stDownloadButton"] button[kind="primary"],
+    div[data-testid="stDownloadButton"] button[kind="secondary"],
+    div[data-testid="stDownloadButton"] button p[data-testid="stMarkdownContainer"] {
         color: #ffffff !important;
     }
 
@@ -89,8 +97,10 @@ st.markdown("""
     }
     
     /* Damit auch beim Hovern der Text weiß bleibt */
-    div[data-testid="stButton"] > button:hover *, 
-    div[data-testid="stDownloadButton"] > button:hover * {
+    div[data-testid="stButton"] > button:hover *,
+    div[data-testid="stButton"] > button:hover p,
+    div[data-testid="stDownloadButton"] > button:hover *,
+    div[data-testid="stDownloadButton"] > button:hover p {
         color: #ffffff !important;
     }
     
