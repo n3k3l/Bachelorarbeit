@@ -12,7 +12,7 @@ from io import BytesIO
 # ───────────────────────────────────────────
 st.set_page_config(layout="wide", page_title="Circadian Analysis")
 
-# OPTIMIZED CSS - FIX FOR WHITE TEXT ON DARK BACKGROUND
+# OPTIMIZED CSS - AGGRESSIVE FIX FOR WHITE TEXT
 st.markdown("""
     <style>
     /* 1. Main Background */
@@ -59,22 +59,34 @@ st.markdown("""
         background-color: #666666 !important;
     }
 
-    /* 5. BUTTONS (Hier wurde der Fix angewendet) */
+    /* 5. BUTTONS & DOWNLOAD BUTTONS (FIXED) */
+    
+    /* Der Button Container */
     .stButton > button, .stDownloadButton > button {
-        color: #ffffff !important;
         background-color: #4a4a4a !important;
         border: 1px solid #666 !important;
+        color: #ffffff !important;
     }
+    
+    /* Hover Effekt */
     .stButton > button:hover, .stDownloadButton > button:hover {
         border-color: #ff4b4b !important;
-        color: #ffffff !important;
         background-color: #555555 !important;
-    }
-    /* WICHTIG: Text im Button UND im Download-Button weiß machen */
-    .stButton > button p, .stDownloadButton > button p {
-        color: #ffffff !important; 
+        color: #ffffff !important;
     }
 
+    /* --- RADIKALER FIX FÜR TEXT IM BUTTON --- */
+    /* Zwingt ALLE Elemente (p, div, span) innerhalb des Buttons weiß zu sein */
+    .stButton > button *, .stDownloadButton > button * {
+        color: #ffffff !important;
+        fill: #ffffff !important; /* Für Icons */
+    }
+
+    /* Spezifischer Fix für das <p> Tag, falls Streamlit es direkt anspricht */
+    div[data-testid="stDownloadButton"] p {
+        color: #ffffff !important;
+    }
+    
     /* 6. Tabs Styling */
     .stTabs [data-baseweb="tab-list"] { gap: 8px; }
     .stTabs [data-baseweb="tab"] {
