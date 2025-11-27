@@ -12,7 +12,7 @@ from io import BytesIO
 # ───────────────────────────────────────────
 st.set_page_config(layout="wide", page_title="Circadian Analysis")
 
-# OPTIMIZED CSS - AGGRESSIVE FIX FOR WHITE TEXT
+# OPTIMIZED CSS - ULTIMATE FIX FOR DOWNLOAD BUTTON TEXT
 st.markdown("""
     <style>
     /* 1. Main Background */
@@ -59,31 +59,38 @@ st.markdown("""
         background-color: #666666 !important;
     }
 
-    /* 5. BUTTONS & DOWNLOAD BUTTONS (FIXED) */
+    /* 5. BUTTONS & DOWNLOAD BUTTONS (ULTIMATE FIX) */
     
-    /* Der Button Container */
-    .stButton > button, .stDownloadButton > button {
+    /* Ziel: Der Button-Container selbst (Sowohl normale als auch Download Buttons) */
+    div[data-testid="stButton"] > button, 
+    div[data-testid="stDownloadButton"] > button {
         background-color: #4a4a4a !important;
         border: 1px solid #666 !important;
         color: #ffffff !important;
     }
+
+    /* Ziel: ALLE Textelemente innerhalb der Buttons (p, div, span) */
+    div[data-testid="stButton"] > button *, 
+    div[data-testid="stDownloadButton"] > button * {
+        color: #ffffff !important;
+    }
     
+    /* Ziel: Speziell das <p> Tag im Download Button (der Übeltäter) */
+    div[data-testid="stDownloadButton"] > button p {
+        color: #ffffff !important;
+    }
+
     /* Hover Effekt */
-    .stButton > button:hover, .stDownloadButton > button:hover {
-        border-color: #ff4b4b !important;
+    div[data-testid="stButton"] > button:hover, 
+    div[data-testid="stDownloadButton"] > button:hover {
         background-color: #555555 !important;
+        border-color: #ff4b4b !important;
         color: #ffffff !important;
     }
-
-    /* --- RADIKALER FIX FÜR TEXT IM BUTTON --- */
-    /* Zwingt ALLE Elemente (p, div, span) innerhalb des Buttons weiß zu sein */
-    .stButton > button *, .stDownloadButton > button * {
-        color: #ffffff !important;
-        fill: #ffffff !important; /* Für Icons */
-    }
-
-    /* Spezifischer Fix für das <p> Tag, falls Streamlit es direkt anspricht */
-    div[data-testid="stDownloadButton"] p {
+    
+    /* Damit auch beim Hovern der Text weiß bleibt */
+    div[data-testid="stButton"] > button:hover *, 
+    div[data-testid="stDownloadButton"] > button:hover * {
         color: #ffffff !important;
     }
     
