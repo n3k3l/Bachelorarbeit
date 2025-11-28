@@ -18,23 +18,11 @@ st.markdown("""
     /* 1. Main Background */
     .stApp { background-color: #f0f2f6; }
     
-    /* 2. Global Text Color (KORRIGIERT) */
-    
-    /* Wir setzen die Farbe auf dem Hauptcontainer. 
-       Alle Texte erben diese Farbe automatisch (dunkel),
-       ES SEI DENN, ein Element sagt explizit etwas anderes (wie der Button). */
-    .stApp {
+    /* 2. Global Text Color */
+    h1, h2, h3, h4, h5, h6, .stMarkdown, p, label, li, span {
         color: #1f1f1f;
         font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
     }
-    
-    /* Überschriften behalten wir explizit bei */
-    h1, h2, h3, h4, h5, h6 {
-        color: #1f1f1f;
-        font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
-    }
-    
-    /* WICHTIG: p, label, span, li wurden hier entfernt! */
     
     /* 3. INPUT FIELDS */
     div[data-baseweb="input"] {
@@ -75,32 +63,40 @@ st.markdown("""
     }
 
     /* 
-   /* 
-    /* 
     ──────────────────────────────────────────────────
-    5. BUTTON STYLING (SIMPLIFIED)
+    5. THE ULTIMATE BUTTON FIX (HIER WAR DAS PROBLEM)
     ──────────────────────────────────────────────────
     */
+    
+    /* Schritt 1: Das Button-Element selbst stylen (Hintergrund dunkel) */
     div[data-testid="stButton"] button, 
     div[data-testid="stDownloadButton"] button {
         background-color: #4a4a4a !important;
         border: 1px solid #666 !important;
-        color: #ffffff !important; /* Das greift jetzt, weil 'p' oben nicht mehr blockiert wird */
+        color: #ffffff !important;
     }
-    
-    /* Damit auch Icons (SVG) weiß sind */
+
+    /* Schritt 2: JEDES Kind-Element im Button (Text, Icons, Container) weiß färben */
+    /* Wir nutzen hier KEIN ">", damit es auch Enkel-Elemente trifft */
     div[data-testid="stButton"] button *, 
     div[data-testid="stDownloadButton"] button * {
         color: #ffffff !important;
-        fill: #ffffff !important;
+        fill: #ffffff !important; /* Wichtig für das Download-Icon (SVG) */
     }
-
-    /* Hover Effekt */
+    
+    /* Schritt 3: Hover-Effekt (Hintergrund heller, Text bleibt weiß) */
     div[data-testid="stButton"] button:hover, 
     div[data-testid="stDownloadButton"] button:hover {
         background-color: #555555 !important;
         border-color: #ff4b4b !important;
         color: #ffffff !important;
+    }
+    
+    /* Auch beim Hovern: Kind-Elemente weiß halten */
+    div[data-testid="stButton"] button:hover *, 
+    div[data-testid="stDownloadButton"] button:hover * {
+        color: #ffffff !important;
+        fill: #ffffff !important;
     }
 
     /* 6. Tabs Styling */
