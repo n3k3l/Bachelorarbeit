@@ -12,79 +12,89 @@ from io import BytesIO
 # ───────────────────────────────────────────
 st.set_page_config(layout="wide", page_title="Circadian Analysis")
 
-# OPTIMIZED CSS
+# OPTIMIZED CSS - ULTIMATE FIX FOR DOWNLOAD BUTTON TEXT
 st.markdown("""
     <style>
-    /* 1. Main Background color */
+    /* 1. Main Background */
     .stApp { background-color: #f0f2f6; }
     
-    /* 2. General Text Color */
-    h1, h2, h3, h4, h5, h6, .stMarkdown, p, label, li {
-        color: #1f1f1f !important;
+    /* 2. Global Text Color */
+    h1, h2, h3, h4, h5, h6, .stMarkdown, p, label, li, span {
+        color: #1f1f1f;
         font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
     }
     
-    /* 3. INPUT FIELDS (Closed State) */
+    /* 3. INPUT FIELDS */
     div[data-baseweb="input"] {
         background-color: #4a4a4a !important; 
         border: 1px solid #666 !important;
     }
-    input.st-ai, input.st-ah { color: #ffffff !important; }
+    div[data-baseweb="input"] input {
+        color: #ffffff !important;
+        caret-color: #ffffff !important;
+    }
     
-    /* 4. DROPDOWNS (Selectbox - Closed State) */
+    /* 4. DROPDOWNS & SELECTBOXES */
     div[data-baseweb="select"] > div {
         background-color: #4a4a4a !important; 
-        color: #ffffff !important;             
         border: 1px solid #666 !important;
+        color: #ffffff !important;
     }
-    div[data-baseweb="select"] span { color: #ffffff !important; }
-    div[data-baseweb="select"] svg { fill: #ffffff !important; }
+    div[data-baseweb="select"] div[class*="content"] {
+        color: #ffffff !important;
+    }
+    div[data-baseweb="select"] svg { 
+        fill: #ffffff !important; 
+    }
     
-    /* 5. DROPDOWNS - POPUP MENU (The Critical Part) */
-    
-    /* Background of the dropdown list container */
-    div[data-baseweb="popover"] > div,
-    ul[data-baseweb="menu"] {
+    /* POPUP MENU */
+    div[data-baseweb="popover"], div[data-baseweb="menu"], ul[data-baseweb="menu"] {
         background-color: #4a4a4a !important;
     }
-    
-    /* The List Item (Option) itself */
-    li[data-baseweb="option"], 
-    li[role="option"] {
+    li[data-baseweb="option"] {
         background-color: #4a4a4a !important;
         color: #ffffff !important;
     }
-    
-    /* FORCE ALL TEXT INSIDE THE OPTION TO BE WHITE */
-    /* This overrides any internal Streamlit dark text settings */
-    li[data-baseweb="option"] *, 
-    li[role="option"] * {
-        color: #ffffff !important;
-    }
-    
-    /* Hover State for Options */
-    li[data-baseweb="option"]:hover, 
-    li[role="option"]:hover {
+    li[data-baseweb="option"]:hover, li[aria-selected="true"] {
         background-color: #666666 !important;
     }
 
-    /* 6. BUTTONS */
-    .stDownloadButton > button, .stButton > button {
-        color: #ffffff !important;
+    /* 5. BUTTONS & DOWNLOAD BUTTONS (ULTIMATE FIX) */
+    
+    /* Ziel: Der Button-Container selbst (Sowohl normale als auch Download Buttons) */
+    div[data-testid="stButton"] > button, 
+    div[data-testid="stDownloadButton"] > button {
         background-color: #4a4a4a !important;
         border: 1px solid #666 !important;
+        color: #ffffff !important;
     }
-    .stDownloadButton > button:hover, .stButton > button:hover {
+
+    /* Ziel: ALLE Textelemente innerhalb der Buttons (p, div, span) */
+    div[data-testid="stButton"] > button *, 
+    div[data-testid="stDownloadButton"] > button * {
+        color: #ffffff !important;
+    }
+    
+    /* Ziel: Speziell das <p> Tag im Download Button (der Übeltäter) */
+    div[data-testid="stDownloadButton"] > button p {
+        color: #ffffff !important;
+    }
+
+    /* Hover Effekt */
+    div[data-testid="stButton"] > button:hover, 
+    div[data-testid="stDownloadButton"] > button:hover {
+        background-color: #555555 !important;
         border-color: #ff4b4b !important;
         color: #ffffff !important;
     }
     
-    /* Force white text inside download button */
-    .stDownloadButton > button * {
+    /* Damit auch beim Hovern der Text weiß bleibt */
+    div[data-testid="stButton"] > button:hover *, 
+    div[data-testid="stDownloadButton"] > button:hover * {
         color: #ffffff !important;
     }
     
-    /* 7. Tabs styling */
+    /* 6. Tabs Styling */
     .stTabs [data-baseweb="tab-list"] { gap: 8px; }
     .stTabs [data-baseweb="tab"] {
         background-color: #ffffff;
@@ -99,61 +109,12 @@ st.markdown("""
         font-weight: bold;
     }
     
-    /* 5. BUTTONS & DOWNLOAD BUTTONS (NUCLEAR OPTION) */
-    
-    /* Base button styling */
-    div[data-testid="stButton"] > button, 
-    div[data-testid="stDownloadButton"] > button {
-        background-color: #4a4a4a !important;
-        border: 1px solid #666 !important;
-        color: #ffffff !important;
-    }
-
-    /* ALL text elements - maximum specificity */
-    div[data-testid="stDownloadButton"] > button *,
-    div[data-testid="stDownloadButton"] > button p,
-    div[data-testid="stDownloadButton"] > button span,
-    div[data-testid="stDownloadButton"] > button div,
-    div[data-testid="stDownloadButton"] button p,
-    div[data-testid="stDownloadButton"] p,
-    div[data-testid="stButton"] > button *,
-    div[data-testid="stButton"] > button p,
-    div[data-testid="stButton"] > button span,
-    div[data-testid="stButton"] > button div {
-        color: #ffffff !important;
-    }
-    
-    /* Target the button element itself with all possible class combinations */
-    button[data-testid="baseButton-secondary"],
-    button[data-testid="baseButton-primary"],
-    div[data-testid="stDownloadButton"] button {
-        color: #ffffff !important;
-    }
-    
-    button[data-testid="baseButton-secondary"] *,
-    button[data-testid="baseButton-primary"] *,
-    button[data-testid="baseButton-secondary"] p,
-    button[data-testid="baseButton-primary"] p {
-        color: #ffffff !important;
-    }
-
-    /* Hover states */
-    div[data-testid="stButton"] > button:hover, 
-    div[data-testid="stDownloadButton"] > button:hover {
-        background-color: #555555 !important;
-        border-color: #ff4b4b !important;
-        color: #ffffff !important;
-    }
-    
-    div[data-testid="stButton"] > button:hover *,
-    div[data-testid="stButton"] > button:hover p,
-    div[data-testid="stDownloadButton"] > button:hover *,
-    div[data-testid="stDownloadButton"] > button:hover p {
-        color: #ffffff !important;
-    }
-    
-    /* 8. Slider Text */
+    /* 7. Slider Labels */
     div[data-testid="stThumbValue"] { color: #1f1f1f !important; }
+    
+    /* 8. Number Input Buttons */
+    button[kind="secondary"] { color: #ffffff !important; }
+    div[data-baseweb="input"] button svg { fill: #ffffff !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -182,6 +143,7 @@ GLUCOSE_CONVERSION_FACTOR = 18.016
 # 2) HELPER FUNCTIONS
 # ───────────────────────────────────────────
 def circadian(t, M, A, t0):
+    """Cosinor Model: M = Mean, A = Amplitude, t0 = Acrophase (Peak Time)"""
     return M + A * np.cos(2 * np.pi * (t - t0) / 24)
 
 def format_time_string(decimal_hour):
@@ -204,7 +166,7 @@ def generate_template_csv():
         'VALUE': [167.0, 95.0, 14.5, 5.2, 105.0],
         'DIM': ['mg/dl', 'mg/dl', 'ug/dl', 'mmol/l', 'mg/dl'],
         'TIME': ['27.11.2013 16:06', '27.11.2013 08:30', '27.11.2013 20:00', '28.11.2013 09:15', '28.11.2013 14:00'],
-        'SEX': ['M', 'F', 'M', 'F', 'M'],
+        'SEX': ['M', 'F', 'M', 'F', 'D'],
         'AGE': [47, 32, 55, 29, 60]
     }
     df = pd.DataFrame(data)
@@ -215,7 +177,7 @@ def load_and_process_data(_file, file_identifier):
     try:
         filename = _file.name.lower()
         
-        # HEADER FINDEN
+        # 1. Header Detection
         if filename.endswith('.xlsx') or filename.endswith('.xls'):
             df_raw = pd.read_excel(_file, header=None, nrows=20)
         else:
@@ -226,7 +188,7 @@ def load_and_process_data(_file, file_identifier):
                 df_raw = pd.read_csv(_file, sep=None, engine='python', header=None, nrows=20, encoding='latin1')
 
         header_row_idx = 0
-        header_keywords = ['VALUE', 'WERT', 'MESSWERT', 'RESULT', 'ANALYT', 'PARAMETER', 'TIME', 'DATUM']
+        header_keywords = ['VALUE', 'WERT', 'RESULT', 'ANALYT', 'TIME', 'DATUM']
         
         for idx, row in df_raw.iterrows():
             row_str = " ".join(row.astype(str)).upper()
@@ -235,7 +197,7 @@ def load_and_process_data(_file, file_identifier):
                 header_row_idx = idx
                 break
         
-        # ECHTES EINLESEN
+        # 2. Real Load
         _file.seek(0)
         if filename.endswith('.xlsx') or filename.endswith('.xls'):
             df = pd.read_excel(_file, header=header_row_idx)
@@ -246,27 +208,27 @@ def load_and_process_data(_file, file_identifier):
                 _file.seek(0)
                 df = pd.read_csv(_file, sep=None, engine='python', header=header_row_idx, encoding='latin1')
 
-        # SPALTEN BEREINIGUNG
+        # 3. Column Cleanup & Mapping
         df.columns = df.columns.astype(str).str.strip().str.replace('"', '').str.replace("'", "").str.upper()
 
         column_candidates = {
-            'value':     ['VALUE', 'WERT', 'ERGEBNIS', 'RESULT', 'MESSWERT', 'CONCENTRATION'],
-            'timestamp': ['TIME', 'ZEIT', 'DATE', 'DATUM', 'ANALYSE_DATE', 'TIMESTAMP', 'PROBENNAHME'],
-            'gender':    ['SEX', 'GENDER', 'GESCHLECHT'],
-            'age':       ['AGE', 'ALTER', 'JAHRE', 'GEBURTSDATUM'],
-            'analyte':   ['ANALYT', 'ANALYTE', 'PARAMETER', 'STOFF', 'TEST', 'BEZEICHNUNG'],
-            'unit':      ['DIM', 'UNIT', 'EINHEIT', 'DIMENSION', 'MASSEINHEIT']
+            'value':     ['VALUE', 'WERT', 'MESSWERT', 'CONCENTRATION'],
+            'timestamp': ['TIME', 'ZEIT', 'DATE', 'DATUM', 'ANALYSE_DATE', 'TIMESTAMP'],
+            'gender':    ['SEX', 'GENDER', 'GESCHLECHT'], 
+            'age':       ['AGE', 'ALTER', 'JAHRE'],       
+            'analyte':   ['ANALYT', 'ANALYTE', 'PARAMETER', 'STOFF'],
+            'unit':      ['DIM', 'UNIT', 'EINHEIT', 'DIMENSION']
         }
         
         found_mapping = {}
         existing_cols = list(df.columns)
         
+        # Exact and Fuzzy Match logic
         for target, candidates in column_candidates.items():
             for candidate in candidates:
                 if candidate in existing_cols:
                     found_mapping[candidate] = target
                     break 
-        
         for target, candidates in column_candidates.items():
             if target not in found_mapping.values():
                 for col in existing_cols:
@@ -278,11 +240,12 @@ def load_and_process_data(_file, file_identifier):
 
         df.rename(columns=found_mapping, inplace=True)
         
+        # Mandatory Columns Check
         if 'value' not in df.columns or 'timestamp' not in df.columns:
-            st.error(f"Error in '{file_identifier}': Konnte Spalten 'Value' oder 'Time' nicht finden. Gefunden: {existing_cols}")
+            st.error(f"Error in '{file_identifier}': Mandatory columns 'VALUE' or 'TIME' missing.")
             return None
 
-        # DATEN BEREINIGUNG
+        # --- DATA CLEANING ---
         if df['value'].dtype == object:
             df['value'] = df['value'].astype(str).str.replace(',', '.', regex=False)
         df['value'] = pd.to_numeric(df['value'], errors='coerce')
@@ -300,45 +263,80 @@ def load_and_process_data(_file, file_identifier):
             df['analyte'] = "Unknown Analyte"
 
         if 'age' in df.columns:
-            df['age'] = pd.to_numeric(df['age'], errors='coerce').fillna(35).astype(int)
+            df['age'] = pd.to_numeric(df['age'], errors='coerce')
+            df['has_age'] = True
         else:
-            df['age'] = 35
+            df['age'] = np.nan
+            df['has_age'] = False
             
         if 'gender' in df.columns:
             def clean_gender(x):
                 s = str(x).strip().upper()
-                if not s or s == 'NAN': return 'Other'
+                if not s or s == 'NAN': return 'Not Specified'
                 if s.startswith('M') or s.startswith('H'): return 'Male'
                 if s.startswith('F') or s.startswith('W'): return 'Female'
-                return 'Other'
+                if s.startswith('D'): return 'Divers'
+                return 'Not Specified'
             df['gender'] = df['gender'].apply(clean_gender)
+            df['has_gender'] = True
         else:
-            df['gender'] = 'Other'
+            df['gender'] = 'Not Specified'
+            df['has_gender'] = False
             
         if 'unit' in df.columns:
             df['unit'] = df['unit'].astype(str).str.strip()
         else:
             df['unit'] = 'units'
-            
-        df['age_group'] = pd.cut(df['age'], bins=[0, 30, 50, 120], labels=["< 30 years", "30-50 years", "> 50 years"], right=False)
-        df['source_file'] = file_identifier
         
+        df['age_group'] = pd.cut(df['age'], bins=[0, 30, 50, 120], labels=["< 30 years", "30-50 years", "> 50 years"], right=False)
+        df['age_group'] = df['age_group'].cat.add_categories(["No Age Data"])
+        df['age_group'] = df['age_group'].fillna("No Age Data")
+        
+        df['source_file'] = file_identifier
         return df
     except Exception as e:
         st.error(f"Fehler beim Verarbeiten von '{file_identifier}': {e}")
         return None
 
+def calculate_r_squared(y_true, y_pred):
+    residuals = y_true - y_pred
+    ss_res = np.sum(residuals**2)
+    ss_tot = np.sum((y_true - np.mean(y_true))**2)
+    if ss_tot == 0: return 0.0
+    return 1 - (ss_res / ss_tot)
+
 def get_fitted_parameters(df_group, value_column='value'):
-    if len(df_group) < 5: return np.nan, np.nan, np.nan
+    """Fits Cosinor with bounds and R-squared calculation."""
+    if len(df_group) < 5: return np.nan, np.nan, np.nan, np.nan
+    
+    # Use medians to reduce noise for initial guess
     medians = df_group.groupby('hour_int')[value_column].median()
-    if len(medians) < 3: return np.nan, np.nan, np.nan
+    if len(medians) < 3: return np.nan, np.nan, np.nan, np.nan
+    
     x, y = medians.index.values, medians.values
-    M_guess, A_guess = np.mean(y), (np.max(y) - np.min(y)) / 2
+    
+    # Guesses
+    M_guess = np.mean(y)
+    A_guess = (np.max(y) - np.min(y)) / 2
     t0_guess = x[np.argmax(y)]
+    
     try:
-        popt, _ = curve_fit(circadian, x, y, p0=[M_guess, A_guess, t0_guess], maxfev=5000)
-        return popt[0], popt[1], popt[2]
-    except: return np.nan, np.nan, np.nan
+        # Optimization: Bounds to keep Amplitude positive and Mean positive
+        # Bounds: ([M_min, A_min, t0_min], [M_max, A_max, t0_max])
+        popt, _ = curve_fit(
+            circadian, x, y, 
+            p0=[M_guess, A_guess, t0_guess], 
+            bounds=([0, 0, -24], [np.inf, np.inf, 48]),
+            maxfev=10000
+        )
+        
+        # Calculate R^2 on the median points
+        y_pred = circadian(x, *popt)
+        r2 = calculate_r_squared(y, y_pred)
+        
+        return popt[0], popt[1], popt[2], r2
+    except: 
+        return np.nan, np.nan, np.nan, np.nan
 
 # ───────────────────────────────────────────
 # 3) STREAMLIT APP
@@ -399,7 +397,7 @@ with tab1:
         ax_sin.set_xlabel("Time of Day (h)"); ax_sin.set_ylabel(f"Concentration ({unit})")
         ax_sin.legend(loc='upper right', frameon=True, facecolor='white', framealpha=1)
         ax_sin.set_xlim(0, 24)
-        st.pyplot(fig_sin)
+        st.pyplot(fig_sin, use_container_width=True)
         plt.close(fig_sin)
         
         st.markdown("---")
@@ -464,74 +462,68 @@ with tab2:
     col_dl, col_up1, col_up2 = st.columns([1, 1, 1])
     
     with col_dl:
-        st.info("Download the template file to see the required structure.")
+        st.info("Download template to see structure.")
         csv_data = generate_template_csv()
-        st.download_button("📄 Download CSV Template", csv_data, "circadian_template.csv", "text/csv")
+        st.download_button("📄 Download Template", csv_data, "circadian_template.csv", "text/csv")
         
     df1, df2 = None, None
     with col_up1:
-        f1 = st.file_uploader("Upload Control Group", type=["csv", "xlsx"], key="file1")
+        f1 = st.file_uploader("Upload Control", type=["csv", "xlsx"], key="file1")
         if f1: df1 = load_and_process_data(f1, "File 1")
     with col_up2:
-        f2 = st.file_uploader("Upload Test Group", type=["csv", "xlsx"], key="file2")
+        f2 = st.file_uploader("Upload Test", type=["csv", "xlsx"], key="file2")
         if f2: df2 = load_and_process_data(f2, "File 2")
 
     valid_dfs = [df for df in [df1, df2] if df is not None]
 
     if valid_dfs:
         df_combined = pd.concat(valid_dfs, ignore_index=True)
+        # Ensure Analyte formatting
         df_combined['analyte'] = df_combined['analyte'].str.strip().str.title()
         
         st.success(f"Loaded {len(df_combined)} records.")
         st.markdown("---")
-        st.markdown("### 2. Filters & Visualization")
+        st.markdown("### 2. Visualization")
         
         available_analytes = sorted(df_combined['analyte'].unique())
-        
         default_ix = 0 
         if len(available_analytes) > 1 and "Unknown Analyte" in available_analytes:
              for i, a in enumerate(available_analytes):
-                 if a != "Unknown Analyte":
-                     default_ix = i
-                     break
+                 if a != "Unknown Analyte": default_ix = i; break
 
         f_col1, f_col2, f_col3, f_col4 = st.columns(4)
         analyte_filter = f_col1.selectbox("Analyte", available_analytes, index=default_ix)
         
         df_analyte = df_combined[df_combined['analyte'] == analyte_filter]
         
+        current_unit = "units"
         if not df_analyte.empty:
             if 'unit' in df_analyte.columns and not df_analyte['unit'].isnull().all():
                 current_unit = df_analyte['unit'].mode()[0]
-            else:
-                current_unit = "units"
-        else:
-            current_unit = "units"
         
+        has_gender = df_analyte['has_gender'].any()
+        has_age = df_analyte['has_age'].any()
+
         gender_opts = ["All"] + sorted(df_analyte['gender'].unique())
-        age_opts = ["All"] + list(df_analyte['age_group'].dropna().unique())
+        age_opts = ["All"] + list(df_analyte['age_group'].unique().dropna())
         source_opts = sorted(df_analyte['source_file'].unique())
         display_opts = ["Combined"] + source_opts if len(source_opts) > 1 else source_opts
         
-        gender_filter = f_col2.selectbox("Gender", gender_opts)
-        age_filter = f_col3.selectbox("Age Group", age_opts)
+        gender_filter = f_col2.selectbox("Gender", gender_opts, disabled=not has_gender)
+        age_filter = f_col3.selectbox("Age Group", age_opts, disabled=not has_age)
         display_mode = f_col4.radio("Display Source", display_opts, horizontal=True)
 
         df_plot = df_analyte.copy()
         if gender_filter != "All": df_plot = df_plot[df_plot['gender'] == gender_filter]
         if age_filter != "All": df_plot = df_plot[df_plot['age_group'] == age_filter]
         
-        if display_mode == "Combined":
-            plot_color, line_color = '#d9d9d9', '#1f1f1f' 
-        elif display_mode == "File 1":
-            df_plot = df_plot[df_plot['source_file'] == 'File 1']
-            plot_color, line_color = '#a0c4ff', '#003366'
-        else:
-            df_plot = df_plot[df_plot['source_file'] == 'File 2']
-            plot_color, line_color = '#ffadad', '#800000'
+        # Colors
+        if display_mode == "Combined": plot_color, line_color = '#d9d9d9', '#1f1f1f' 
+        elif display_mode == "File 1": df_plot = df_plot[df_plot['source_file'] == 'File 1']; plot_color, line_color = '#a0c4ff', '#003366'
+        else: df_plot = df_plot[df_plot['source_file'] == 'File 2']; plot_color, line_color = '#ffadad', '#800000'
 
-        fig_box, ax_box = plt.subplots(figsize=(12, 6), facecolor='white')
-        ax_box.set_title(f"{analyte_filter} ({display_mode}) - {gender_filter}, {age_filter}")
+        fig_box, ax_box = plt.subplots(figsize=(12, 5), facecolor='white')
+        ax_box.set_title(f"{analyte_filter} ({display_mode})")
         ax_box.set_xlabel("Time of Day (h)")
         ax_box.set_ylabel(f"Concentration ({current_unit})")
         ax_box.set_xlim(-0.5, 23.5); ax_box.set_xticks(range(24))
@@ -543,47 +535,67 @@ with tab2:
                            medianprops=dict(color=line_color, linewidth=2))
             
             medians = df_plot.groupby('hour_int')['value'].median().reindex(range(24))
-            ax_box.plot(range(24), medians, 'o-', color=line_color, lw=2, label='Median')
-            ax_box.legend(frameon=True, facecolor='white')
+            # Only plot line if there is data
+            if medians.notna().any():
+                ax_box.plot(range(24), medians, 'o-', color=line_color, lw=2, label='Median')
+                ax_box.legend(frameon=True, facecolor='white')
         else:
-            ax_box.text(12, 0, "No data found", ha='center')
+            ax_box.text(12, 0, "No data for selection", ha='center')
             
-        st.pyplot(fig_box)
+        st.pyplot(fig_box, use_container_width=True)
         plt.close(fig_box)
 
-        st.markdown("### 3. Model Parameters")
+        # --- MODEL FITTING ---
+        st.markdown("### 3. Estimated Model Parameters")
         results = []
         df_fit_base = df_analyte if display_mode == "Combined" else df_analyte[df_analyte['source_file'] == display_mode]
+        
         genders = sorted(df_fit_base['gender'].unique())
-        if 'age_group' in df_fit_base.columns:
-            ages = sorted(df_fit_base['age_group'].unique().dropna())
-        else:
-            ages = []
+        ages = sorted(df_fit_base['age_group'].unique().dropna()) if 'age_group' in df_fit_base.columns else []
         
         if genders and ages:
             rows, cols = len(ages), len(genders)
-            fig_grid, axes = plt.subplots(rows, cols, figsize=(5*cols, 3*rows), 
+            fig_grid, axes = plt.subplots(rows, cols, figsize=(max(5, 5*cols), max(3, 3*rows)), 
                                           sharex=True, sharey=True, squeeze=False, facecolor='white')
             
             for i, ag in enumerate(ages):
                 for j, gen in enumerate(genders):
                     ax = axes[i, j]
-                    ax.set_title(f"{gen}, {ag}", fontsize=9)
+                    ax.set_title(f"{gen}, {ag}", fontsize=10)
                     sub = df_fit_base[(df_fit_base['gender'] == gen) & (df_fit_base['age_group'] == ag)]
+                    
                     if not sub.empty:
-                        M_fit, A_fit, t0_fit = get_fitted_parameters(sub)
+                        # NEW: returns R2 as well
+                        M_fit, A_fit, t0_fit, r2_fit = get_fitted_parameters(sub)
                         meds = sub.groupby('hour_int')['value'].median()
+                        
                         ax.plot(meds.index, meds.values, 'o', color='black', ms=4, alpha=0.6)
+                        
                         if not np.isnan(M_fit):
                             t_lin = np.linspace(0, 24, 100)
                             y_lin = circadian(t_lin, M_fit, A_fit, t0_fit)
-                            ax.plot(t_lin, y_lin, '-', color='red', alpha=0.8)
-                            results.append({"Gender": gen, "Age": ag, "M": M_fit, "A": A_fit, "t0": t0_fit%24})
+                            ax.plot(t_lin, y_lin, '-', color='red', alpha=0.8, label=f"Fit ($R^2={r2_fit:.2f}$)")
+                            ax.legend(fontsize=7, loc='upper right')
+                            
+                            results.append({
+                                "Gender": gen, "Age": ag, 
+                                "Mean (M)": M_fit, "Amplitude (A)": A_fit, 
+                                "Acrophase (t0)": t0_fit % 24, "R2": r2_fit
+                            })
+                    else:
+                        ax.text(12, 0, "No Data", ha='center', fontsize=8, color='gray')
                     ax.set_xlim(0,24)
-            st.pyplot(fig_grid)
+            st.pyplot(fig_grid, use_container_width=True)
             plt.close(fig_grid)
             
             if results:
-                st.dataframe(pd.DataFrame(results).set_index(['Gender', 'Age']).style.format("{:.2f}"))
+                res_df = pd.DataFrame(results)
+                st.dataframe(res_df.style.format({"Mean (M)": "{:.2f}", "Amplitude (A)": "{:.2f}", "Acrophase (t0)": "{:.2f}", "R2": "{:.3f}"}))
+                
+                # Download Button for Results
+                csv_res = res_df.to_csv(index=False).encode('utf-8')
+                st.download_button("💾 Download Parameters (CSV)", csv_res, f"fit_results_{analyte_filter}.csv", "text/csv")
+        else:
+            st.info("Insufficient data grouping to display grid fits.")
     else:
-        st.warning("Please upload a CSV or Excel file to begin.")
+        st.warning("Please upload a CSV or Excel file to begin analysis.")
