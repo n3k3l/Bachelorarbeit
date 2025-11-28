@@ -30,6 +30,7 @@ st.markdown("""
     
     /* Überschriften behalten wir explizit bei */
     h1, h2, h3, h4, h5, h6 {
+        color: #1f1f1f;
         font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
     }
     
