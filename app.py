@@ -18,11 +18,23 @@ st.markdown("""
     /* 1. Main Background */
     .stApp { background-color: #f0f2f6; }
     
-    /* 2. Global Text Color */
-    h1, h2, h3, h4, h5, h6, .stMarkdown, p, label, li, span {
+    /* 2. Global Text Color (KORRIGIERT) */
+    
+    /* Wir setzen die Farbe auf dem Hauptcontainer. 
+       Alle Texte erben diese Farbe automatisch (dunkel),
+       ES SEI DENN, ein Element sagt explizit etwas anderes (wie der Button). */
+    .stApp {
         color: #1f1f1f;
         font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
     }
+    
+    /* Überschriften behalten wir explizit bei */
+    h1, h2, h3, h4, h5, h6 {
+        color: #1f1f1f;
+        font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
+    }
+    
+    /* WICHTIG: p, label, span, li wurden hier entfernt! */
     
     /* 3. INPUT FIELDS */
     div[data-baseweb="input"] {
@@ -64,53 +76,31 @@ st.markdown("""
 
     /* 
    /* 
+    /* 
     ──────────────────────────────────────────────────
-    5. THE ULTIMATE BUTTON FIX (OPTIMIERT)
+    5. BUTTON STYLING (SIMPLIFIED)
     ──────────────────────────────────────────────────
     */
-    
-    /* Hintergrund und Rahmen des Buttons */
     div[data-testid="stButton"] button, 
     div[data-testid="stDownloadButton"] button {
         background-color: #4a4a4a !important;
         border: 1px solid #666 !important;
-        color: #ffffff !important;
-    }
-
-    /* 
-       WICHTIG: Explizites Überschreiben der globalen p und span Regeln 
-       für den Text im Button. Der Stern (*) allein reicht oft nicht, 
-       wenn global p { color: dark } gesetzt ist.
-    */
-    div[data-testid="stButton"] button p, 
-    div[data-testid="stDownloadButton"] button p,
-    div[data-testid="stButton"] button span, 
-    div[data-testid="stDownloadButton"] button span,
-    div[data-testid="stButton"] button div, 
-    div[data-testid="stDownloadButton"] button div {
-        color: #ffffff !important;
-    }
-
-    /* Zusätzlich für SVGs (Icons) */
-    div[data-testid="stButton"] button svg, 
-    div[data-testid="stDownloadButton"] button svg {
-        fill: #ffffff !important;
-        color: #ffffff !important;
+        color: #ffffff !important; /* Das greift jetzt, weil 'p' oben nicht mehr blockiert wird */
     }
     
-    /* Hover-Effekt */
+    /* Damit auch Icons (SVG) weiß sind */
+    div[data-testid="stButton"] button *, 
+    div[data-testid="stDownloadButton"] button * {
+        color: #ffffff !important;
+        fill: #ffffff !important;
+    }
+
+    /* Hover Effekt */
     div[data-testid="stButton"] button:hover, 
     div[data-testid="stDownloadButton"] button:hover {
         background-color: #555555 !important;
         border-color: #ff4b4b !important;
         color: #ffffff !important;
-    }
-    
-    /* Hover-Effekt für Text und Icons sicherstellen */
-    div[data-testid="stButton"] button:hover *, 
-    div[data-testid="stDownloadButton"] button:hover * {
-        color: #ffffff !important;
-        fill: #ffffff !important;
     }
 
     /* 6. Tabs Styling */
