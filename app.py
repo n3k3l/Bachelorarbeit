@@ -20,7 +20,7 @@ st.markdown("""
     
     /* 2. Global Text Color */
     h1, h2, h3, h4, h5, h6, .stMarkdown, p, label, li, span {
-        color: #1f1f1f;
+        color: #FFFFFFF !important;
         font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
     }
     
