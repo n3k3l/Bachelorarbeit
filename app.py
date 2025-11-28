@@ -101,7 +101,7 @@ st.markdown("""
         border-radius: 4px 4px 0px 0px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         padding: 10px 20px;
-        /*color: #1f1f1f;*/
+        color: #1f1f1f;
     }
     .stTabs [aria-selected="true"] {
         background-color: #ffffff;
