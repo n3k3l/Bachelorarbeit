@@ -99,6 +99,59 @@ st.markdown("""
         font-weight: bold;
     }
     
+    /* 5. BUTTONS & DOWNLOAD BUTTONS (NUCLEAR OPTION) */
+    
+    /* Base button styling */
+    div[data-testid="stButton"] > button, 
+    div[data-testid="stDownloadButton"] > button {
+        background-color: #4a4a4a !important;
+        border: 1px solid #666 !important;
+        color: #ffffff !important;
+    }
+
+    /* ALL text elements - maximum specificity */
+    div[data-testid="stDownloadButton"] > button *,
+    div[data-testid="stDownloadButton"] > button p,
+    div[data-testid="stDownloadButton"] > button span,
+    div[data-testid="stDownloadButton"] > button div,
+    div[data-testid="stDownloadButton"] button p,
+    div[data-testid="stDownloadButton"] p,
+    div[data-testid="stButton"] > button *,
+    div[data-testid="stButton"] > button p,
+    div[data-testid="stButton"] > button span,
+    div[data-testid="stButton"] > button div {
+        color: #ffffff !important;
+    }
+    
+    /* Target the button element itself with all possible class combinations */
+    button[data-testid="baseButton-secondary"],
+    button[data-testid="baseButton-primary"],
+    div[data-testid="stDownloadButton"] button {
+        color: #ffffff !important;
+    }
+    
+    button[data-testid="baseButton-secondary"] *,
+    button[data-testid="baseButton-primary"] *,
+    button[data-testid="baseButton-secondary"] p,
+    button[data-testid="baseButton-primary"] p {
+        color: #ffffff !important;
+    }
+
+    /* Hover states */
+    div[data-testid="stButton"] > button:hover, 
+    div[data-testid="stDownloadButton"] > button:hover {
+        background-color: #555555 !important;
+        border-color: #ff4b4b !important;
+        color: #ffffff !important;
+    }
+    
+    div[data-testid="stButton"] > button:hover *,
+    div[data-testid="stButton"] > button:hover p,
+    div[data-testid="stDownloadButton"] > button:hover *,
+    div[data-testid="stDownloadButton"] > button:hover p {
+        color: #ffffff !important;
+    }
+    
     /* 8. Slider Text */
     div[data-testid="stThumbValue"] { color: #1f1f1f !important; }
     </style>
