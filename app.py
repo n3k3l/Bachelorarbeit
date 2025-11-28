@@ -63,12 +63,13 @@ st.markdown("""
     }
 
     /* 
+   /* 
     ──────────────────────────────────────────────────
-    5. THE ULTIMATE BUTTON FIX (HIER WAR DAS PROBLEM)
+    5. THE ULTIMATE BUTTON FIX (OPTIMIERT)
     ──────────────────────────────────────────────────
     */
     
-    /* Schritt 1: Das Button-Element selbst stylen (Hintergrund dunkel) */
+    /* Hintergrund und Rahmen des Buttons */
     div[data-testid="stButton"] button, 
     div[data-testid="stDownloadButton"] button {
         background-color: #4a4a4a !important;
@@ -76,15 +77,28 @@ st.markdown("""
         color: #ffffff !important;
     }
 
-    /* Schritt 2: JEDES Kind-Element im Button (Text, Icons, Container) weiß färben */
-    /* Wir nutzen hier KEIN ">", damit es auch Enkel-Elemente trifft */
-    div[data-testid="stButton"] button *, 
-    div[data-testid="stDownloadButton"] button * {
+    /* 
+       WICHTIG: Explizites Überschreiben der globalen p und span Regeln 
+       für den Text im Button. Der Stern (*) allein reicht oft nicht, 
+       wenn global p { color: dark } gesetzt ist.
+    */
+    div[data-testid="stButton"] button p, 
+    div[data-testid="stDownloadButton"] button p,
+    div[data-testid="stButton"] button span, 
+    div[data-testid="stDownloadButton"] button span,
+    div[data-testid="stButton"] button div, 
+    div[data-testid="stDownloadButton"] button div {
         color: #ffffff !important;
-        fill: #ffffff !important; /* Wichtig für das Download-Icon (SVG) */
+    }
+
+    /* Zusätzlich für SVGs (Icons) */
+    div[data-testid="stButton"] button svg, 
+    div[data-testid="stDownloadButton"] button svg {
+        fill: #ffffff !important;
+        color: #ffffff !important;
     }
     
-    /* Schritt 3: Hover-Effekt (Hintergrund heller, Text bleibt weiß) */
+    /* Hover-Effekt */
     div[data-testid="stButton"] button:hover, 
     div[data-testid="stDownloadButton"] button:hover {
         background-color: #555555 !important;
@@ -92,7 +106,7 @@ st.markdown("""
         color: #ffffff !important;
     }
     
-    /* Auch beim Hovern: Kind-Elemente weiß halten */
+    /* Hover-Effekt für Text und Icons sicherstellen */
     div[data-testid="stButton"] button:hover *, 
     div[data-testid="stDownloadButton"] button:hover * {
         color: #ffffff !important;
