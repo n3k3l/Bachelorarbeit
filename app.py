@@ -12,7 +12,7 @@ from io import BytesIO
 # ───────────────────────────────────────────
 st.set_page_config(layout="wide", page_title="Circadian Analysis")
 
-# OPTIMIZED CSS - ULTIMATE FIX FOR DOWNLOAD BUTTON TEXT
+# OPTIMIZED CSS
 st.markdown("""
     <style>
     /* 1. Main Background */
@@ -34,7 +34,7 @@ st.markdown("""
         caret-color: #ffffff !important;
     }
     
-    /* 4. DROPDOWNS & SELECTBOXES */
+    /* 4. DROPDOWNS */
     div[data-baseweb="select"] > div {
         background-color: #4a4a4a !important; 
         border: 1px solid #666 !important;
@@ -47,7 +47,7 @@ st.markdown("""
         fill: #ffffff !important; 
     }
     
-    /* POPUP MENU */
+    /* POPUP MENU FOR DROPDOWNS */
     div[data-baseweb="popover"], div[data-baseweb="menu"], ul[data-baseweb="menu"] {
         background-color: #4a4a4a !important;
     }
@@ -55,45 +55,50 @@ st.markdown("""
         background-color: #4a4a4a !important;
         color: #ffffff !important;
     }
+    li[data-baseweb="option"] * {
+        color: #ffffff !important; /* Zwingt Text in Dropdowns weiß */
+    }
     li[data-baseweb="option"]:hover, li[aria-selected="true"] {
         background-color: #666666 !important;
     }
 
-    /* 5. BUTTONS & DOWNLOAD BUTTONS (ULTIMATE FIX) */
+    /* 
+    ──────────────────────────────────────────────────
+    5. THE ULTIMATE BUTTON FIX (HIER WAR DAS PROBLEM)
+    ──────────────────────────────────────────────────
+    */
     
-    /* Ziel: Der Button-Container selbst (Sowohl normale als auch Download Buttons) */
-    div[data-testid="stButton"] > button, 
-    div[data-testid="stDownloadButton"] > button {
+    /* Schritt 1: Das Button-Element selbst stylen (Hintergrund dunkel) */
+    div[data-testid="stButton"] button, 
+    div[data-testid="stDownloadButton"] button {
         background-color: #4a4a4a !important;
         border: 1px solid #666 !important;
         color: #ffffff !important;
     }
 
-    /* Ziel: ALLE Textelemente innerhalb der Buttons (p, div, span) */
-    div[data-testid="stButton"] > button *, 
-    div[data-testid="stDownloadButton"] > button * {
+    /* Schritt 2: JEDES Kind-Element im Button (Text, Icons, Container) weiß färben */
+    /* Wir nutzen hier KEIN ">", damit es auch Enkel-Elemente trifft */
+    div[data-testid="stButton"] button *, 
+    div[data-testid="stDownloadButton"] button * {
         color: #ffffff !important;
+        fill: #ffffff !important; /* Wichtig für das Download-Icon (SVG) */
     }
     
-    /* Ziel: Speziell das <p> Tag im Download Button (der Übeltäter) */
-    div[data-testid="stDownloadButton"] > button p {
-        color: #ffffff !important;
-    }
-
-    /* Hover Effekt */
-    div[data-testid="stButton"] > button:hover, 
-    div[data-testid="stDownloadButton"] > button:hover {
+    /* Schritt 3: Hover-Effekt (Hintergrund heller, Text bleibt weiß) */
+    div[data-testid="stButton"] button:hover, 
+    div[data-testid="stDownloadButton"] button:hover {
         background-color: #555555 !important;
         border-color: #ff4b4b !important;
         color: #ffffff !important;
     }
     
-    /* Damit auch beim Hovern der Text weiß bleibt */
-    div[data-testid="stButton"] > button:hover *, 
-    div[data-testid="stDownloadButton"] > button:hover * {
+    /* Auch beim Hovern: Kind-Elemente weiß halten */
+    div[data-testid="stButton"] button:hover *, 
+    div[data-testid="stDownloadButton"] button:hover * {
         color: #ffffff !important;
+        fill: #ffffff !important;
     }
-    
+
     /* 6. Tabs Styling */
     .stTabs [data-baseweb="tab-list"] { gap: 8px; }
     .stTabs [data-baseweb="tab"] {
@@ -143,7 +148,6 @@ GLUCOSE_CONVERSION_FACTOR = 18.016
 # 2) HELPER FUNCTIONS
 # ───────────────────────────────────────────
 def circadian(t, M, A, t0):
-    """Cosinor Model: M = Mean, A = Amplitude, t0 = Acrophase (Peak Time)"""
     return M + A * np.cos(2 * np.pi * (t - t0) / 24)
 
 def format_time_string(decimal_hour):
@@ -176,8 +180,6 @@ def generate_template_csv():
 def load_and_process_data(_file, file_identifier):
     try:
         filename = _file.name.lower()
-        
-        # 1. Header Detection
         if filename.endswith('.xlsx') or filename.endswith('.xls'):
             df_raw = pd.read_excel(_file, header=None, nrows=20)
         else:
@@ -189,7 +191,6 @@ def load_and_process_data(_file, file_identifier):
 
         header_row_idx = 0
         header_keywords = ['VALUE', 'WERT', 'RESULT', 'ANALYT', 'TIME', 'DATUM']
-        
         for idx, row in df_raw.iterrows():
             row_str = " ".join(row.astype(str)).upper()
             matches = sum(1 for kw in header_keywords if kw in row_str)
@@ -197,7 +198,6 @@ def load_and_process_data(_file, file_identifier):
                 header_row_idx = idx
                 break
         
-        # 2. Real Load
         _file.seek(0)
         if filename.endswith('.xlsx') or filename.endswith('.xls'):
             df = pd.read_excel(_file, header=header_row_idx)
@@ -208,7 +208,6 @@ def load_and_process_data(_file, file_identifier):
                 _file.seek(0)
                 df = pd.read_csv(_file, sep=None, engine='python', header=header_row_idx, encoding='latin1')
 
-        # 3. Column Cleanup & Mapping
         df.columns = df.columns.astype(str).str.strip().str.replace('"', '').str.replace("'", "").str.upper()
 
         column_candidates = {
@@ -222,30 +221,21 @@ def load_and_process_data(_file, file_identifier):
         
         found_mapping = {}
         existing_cols = list(df.columns)
-        
-        # Exact and Fuzzy Match logic
         for target, candidates in column_candidates.items():
             for candidate in candidates:
-                if candidate in existing_cols:
-                    found_mapping[candidate] = target
-                    break 
+                if candidate in existing_cols: found_mapping[candidate] = target; break 
         for target, candidates in column_candidates.items():
             if target not in found_mapping.values():
                 for col in existing_cols:
                     for candidate in candidates:
-                        if candidate in col and col not in found_mapping:
-                            found_mapping[col] = target
-                            break
+                        if candidate in col and col not in found_mapping: found_mapping[col] = target; break
                     if target in found_mapping.values(): break
 
         df.rename(columns=found_mapping, inplace=True)
-        
-        # Mandatory Columns Check
         if 'value' not in df.columns or 'timestamp' not in df.columns:
             st.error(f"Error in '{file_identifier}': Mandatory columns 'VALUE' or 'TIME' missing.")
             return None
 
-        # --- DATA CLEANING ---
         if df['value'].dtype == object:
             df['value'] = df['value'].astype(str).str.replace(',', '.', regex=False)
         df['value'] = pd.to_numeric(df['value'], errors='coerce')
@@ -291,7 +281,6 @@ def load_and_process_data(_file, file_identifier):
         df['age_group'] = pd.cut(df['age'], bins=[0, 30, 50, 120], labels=["< 30 years", "30-50 years", "> 50 years"], right=False)
         df['age_group'] = df['age_group'].cat.add_categories(["No Age Data"])
         df['age_group'] = df['age_group'].fillna("No Age Data")
-        
         df['source_file'] = file_identifier
         return df
     except Exception as e:
@@ -306,34 +295,16 @@ def calculate_r_squared(y_true, y_pred):
     return 1 - (ss_res / ss_tot)
 
 def get_fitted_parameters(df_group, value_column='value'):
-    """Fits Cosinor with bounds and R-squared calculation."""
     if len(df_group) < 5: return np.nan, np.nan, np.nan, np.nan
-    
-    # Use medians to reduce noise for initial guess
     medians = df_group.groupby('hour_int')[value_column].median()
     if len(medians) < 3: return np.nan, np.nan, np.nan, np.nan
-    
     x, y = medians.index.values, medians.values
-    
-    # Guesses
-    M_guess = np.mean(y)
-    A_guess = (np.max(y) - np.min(y)) / 2
+    M_guess, A_guess = np.mean(y), (np.max(y) - np.min(y)) / 2
     t0_guess = x[np.argmax(y)]
-    
     try:
-        # Optimization: Bounds to keep Amplitude positive and Mean positive
-        # Bounds: ([M_min, A_min, t0_min], [M_max, A_max, t0_max])
-        popt, _ = curve_fit(
-            circadian, x, y, 
-            p0=[M_guess, A_guess, t0_guess], 
-            bounds=([0, 0, -24], [np.inf, np.inf, 48]),
-            maxfev=10000
-        )
-        
-        # Calculate R^2 on the median points
+        popt, _ = curve_fit(circadian, x, y, p0=[M_guess, A_guess, t0_guess], bounds=([0, 0, -24], [np.inf, np.inf, 48]), maxfev=10000)
         y_pred = circadian(x, *popt)
         r2 = calculate_r_squared(y, y_pred)
-        
         return popt[0], popt[1], popt[2], r2
     except: 
         return np.nan, np.nan, np.nan, np.nan
@@ -397,7 +368,7 @@ with tab1:
         ax_sin.set_xlabel("Time of Day (h)"); ax_sin.set_ylabel(f"Concentration ({unit})")
         ax_sin.legend(loc='upper right', frameon=True, facecolor='white', framealpha=1)
         ax_sin.set_xlim(0, 24)
-        st.pyplot(fig_sin, use_container_width=True)
+        st.pyplot(fig_sin)
         plt.close(fig_sin)
         
         st.markdown("---")
@@ -478,7 +449,6 @@ with tab2:
 
     if valid_dfs:
         df_combined = pd.concat(valid_dfs, ignore_index=True)
-        # Ensure Analyte formatting
         df_combined['analyte'] = df_combined['analyte'].str.strip().str.title()
         
         st.success(f"Loaded {len(df_combined)} records.")
@@ -517,7 +487,6 @@ with tab2:
         if gender_filter != "All": df_plot = df_plot[df_plot['gender'] == gender_filter]
         if age_filter != "All": df_plot = df_plot[df_plot['age_group'] == age_filter]
         
-        # Colors
         if display_mode == "Combined": plot_color, line_color = '#d9d9d9', '#1f1f1f' 
         elif display_mode == "File 1": df_plot = df_plot[df_plot['source_file'] == 'File 1']; plot_color, line_color = '#a0c4ff', '#003366'
         else: df_plot = df_plot[df_plot['source_file'] == 'File 2']; plot_color, line_color = '#ffadad', '#800000'
@@ -535,7 +504,6 @@ with tab2:
                            medianprops=dict(color=line_color, linewidth=2))
             
             medians = df_plot.groupby('hour_int')['value'].median().reindex(range(24))
-            # Only plot line if there is data
             if medians.notna().any():
                 ax_box.plot(range(24), medians, 'o-', color=line_color, lw=2, label='Median')
                 ax_box.legend(frameon=True, facecolor='white')
@@ -545,7 +513,6 @@ with tab2:
         st.pyplot(fig_box, use_container_width=True)
         plt.close(fig_box)
 
-        # --- MODEL FITTING ---
         st.markdown("### 3. Estimated Model Parameters")
         results = []
         df_fit_base = df_analyte if display_mode == "Combined" else df_analyte[df_analyte['source_file'] == display_mode]
@@ -565,7 +532,6 @@ with tab2:
                     sub = df_fit_base[(df_fit_base['gender'] == gen) & (df_fit_base['age_group'] == ag)]
                     
                     if not sub.empty:
-                        # NEW: returns R2 as well
                         M_fit, A_fit, t0_fit, r2_fit = get_fitted_parameters(sub)
                         meds = sub.groupby('hour_int')['value'].median()
                         
@@ -592,7 +558,6 @@ with tab2:
                 res_df = pd.DataFrame(results)
                 st.dataframe(res_df.style.format({"Mean (M)": "{:.2f}", "Amplitude (A)": "{:.2f}", "Acrophase (t0)": "{:.2f}", "R2": "{:.3f}"}))
                 
-                # Download Button for Results
                 csv_res = res_df.to_csv(index=False).encode('utf-8')
                 st.download_button("💾 Download Parameters (CSV)", csv_res, f"fit_results_{analyte_filter}.csv", "text/csv")
         else:
