@@ -47,7 +47,7 @@ st.markdown("""
         fill: #ffffff !important; 
     }
     
-    /* POPUP MENU FOR DROPDOWNS */
+    /* POPUP MENU */
     div[data-baseweb="popover"], div[data-baseweb="menu"], ul[data-baseweb="menu"] {
         background-color: #4a4a4a !important;
     }
@@ -56,43 +56,30 @@ st.markdown("""
         color: #ffffff !important;
     }
     li[data-baseweb="option"] * {
-        color: #ffffff !important; /* Zwingt Text in Dropdowns weiß */
+        color: #ffffff !important; 
     }
     li[data-baseweb="option"]:hover, li[aria-selected="true"] {
         background-color: #666666 !important;
     }
 
-    /* 
-    ──────────────────────────────────────────────────
-    5. THE ULTIMATE BUTTON FIX (HIER WAR DAS PROBLEM)
-    ──────────────────────────────────────────────────
-    */
-    
-    /* Schritt 1: Das Button-Element selbst stylen (Hintergrund dunkel) */
+    /* 5. THE ULTIMATE BUTTON FIX */
     div[data-testid="stButton"] button, 
     div[data-testid="stDownloadButton"] button {
         background-color: #4a4a4a !important;
         border: 1px solid #666 !important;
         color: #ffffff !important;
     }
-
-    /* Schritt 2: JEDES Kind-Element im Button (Text, Icons, Container) weiß färben */
-    /* Wir nutzen hier KEIN ">", damit es auch Enkel-Elemente trifft */
     div[data-testid="stButton"] button *, 
     div[data-testid="stDownloadButton"] button * {
         color: #ffffff !important;
-        fill: #ffffff !important; /* Wichtig für das Download-Icon (SVG) */
+        fill: #ffffff !important; 
     }
-    
-    /* Schritt 3: Hover-Effekt (Hintergrund heller, Text bleibt weiß) */
     div[data-testid="stButton"] button:hover, 
     div[data-testid="stDownloadButton"] button:hover {
         background-color: #555555 !important;
         border-color: #ff4b4b !important;
         color: #ffffff !important;
     }
-    
-    /* Auch beim Hovern: Kind-Elemente weiß halten */
     div[data-testid="stButton"] button:hover *, 
     div[data-testid="stDownloadButton"] button:hover * {
         color: #ffffff !important;
@@ -132,17 +119,31 @@ plt.rcParams['ytick.color'] = '#1f1f1f'
 st.markdown("<h2 style='text-align:center; margin-bottom: 25px;'>Visualization & Analysis of Diurnal Fluctuations</h2>", unsafe_allow_html=True)
 
 # ───────────────────────────────────────────
-# 1) CONSTANTS
+# 1) CONSTANTS & CONVERSION LOGIC
 # ───────────────────────────────────────────
+# Base Units in default_params:
+# Glucose -> mg/dL
+# Cortisol -> µg/dL (Micrograms per Deciliter)
+
 default_params = {
-    ("Glucose", "Male"):    {"t0": 8.5, "A": 15, "MU": 12, "M": 100},
-    ("Glucose", "Female"):  {"t0": 9.0, "A": 13, "MU": 11, "M":  95},
-    ("Cortisol", "Male"):   {"t0": 7.0, "A": 20, "MU": 10, "M": 180},
-    ("Cortisol", "Female"): {"t0": 7.5, "A": 18, "MU": 10, "M": 170},
+    # Glucose (Base: mg/dL)
+    ("Glucose", "Male"):    {"t0": 14.0, "A": 10, "MU": 12, "M": 100},
+    ("Glucose", "Female"):  {"t0": 14.5, "A": 10, "MU": 11, "M":  95},
+    
+    # Cortisol (Base: µg/dL) - Corrected to realistic µg/dL values (Mean ~15, Amp ~7)
+    ("Cortisol", "Male"):   {"t0": 7.0, "A": 8.0, "MU": 10, "M": 15.0}, 
+    ("Cortisol", "Female"): {"t0": 7.5, "A": 7.5, "MU": 10, "M": 14.0},
+    
+    # Other (Arbitrary)
     ("Other", "Male"):      {"t0": 4.0, "A": 10, "MU": 15, "M": 100},
     ("Other", "Female"):    {"t0": 4.5, "A": 10, "MU": 15, "M":  95},
 }
-GLUCOSE_CONVERSION_FACTOR = 18.016
+
+# Factors to convert FROM Base Unit TO SI Unit
+FACTORS = {
+    "Glucose": 18.016,   # Divide by this (mg/dL -> mmol/L)
+    "Cortisol": 27.586   # Multiply by this (µg/dL -> nmol/L)
+}
 
 # ───────────────────────────────────────────
 # 2) HELPER FUNCTIONS
@@ -326,25 +327,59 @@ with tab1:
         t1_time = c2.time_input("Time t₁", value=datetime.time(8, 0), key="t1_sim")
         t1_hour = t1_time.hour + t1_time.minute / 60
         
-        unit = st.radio("Unit for Glucose", ["mg/dL", "mmol/L"], horizontal=True) if analyte == "Glucose" else "mg/dL"
+        # --- UNIT SELECTION LOGIC ---
+        unit_label = "Unit"
+        unit_options = ["units"]
         
+        if analyte == "Glucose":
+            unit_options = ["mg/dL", "mmol/L"]
+        elif analyte == "Cortisol":
+            unit_options = ["µg/dL", "nmol/L"]
+            
+        selected_unit = st.radio(f"Unit for {analyte}", unit_options, horizontal=True)
+        
+        # Load Defaults (Base Units)
         p = default_params.get((analyte, gender), default_params[("Other", "Male")])
         t0_lit, A_lit, MU_perc_lit, M_literature = p["t0"], p["A"], p["MU"], p["M"]
+        
+        # --- CONVERSION LOGIC FOR DISPLAY/INPUT ---
+        # Helper to convert Base -> Display
+        def to_display(val, ana, unit):
+            if ana == "Glucose" and unit == "mmol/L":
+                return val / FACTORS["Glucose"]
+            if ana == "Cortisol" and unit == "nmol/L":
+                return val * FACTORS["Cortisol"]
+            return val
+
+        # Helper to convert Display -> Base (for Input)
+        def to_base(val, ana, unit):
+            if ana == "Glucose" and unit == "mmol/L":
+                return val * FACTORS["Glucose"]
+            if ana == "Cortisol" and unit == "nmol/L":
+                return val / FACTORS["Cortisol"]
+            return val
         
         st.markdown("**1. Adjust Model**")
         personalize_mode = st.checkbox("Adjust Mean (M) to measured value at t₁", value=True)
         M = M_literature
+        
         if personalize_mode:
-            val_default = M_literature / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else float(M_literature)
-            step_val = 0.1 if unit == 'mmol/L' else 1.0
-            y_measured = st.number_input(f"Value at t₁ ({format_time_string(t1_hour)})", value=val_default, step=step_val, format="%.1f")
-            y_measured_mgdl = y_measured * GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else y_measured
-            M = y_measured_mgdl - A_lit * np.cos(2 * np.pi * (t1_hour - t0_lit) / 24)
+            # Show default value in SELECTED unit
+            val_default_disp = to_display(M_literature, analyte, selected_unit)
+            
+            step_val = 0.1 if (selected_unit in ["mmol/L", "µg/dL"]) else 1.0
+            y_measured_disp = st.number_input(f"Value at t₁ ({format_time_string(t1_hour)}) in {selected_unit}", 
+                                              value=float(val_default_disp), step=step_val, format="%.1f")
+            
+            # Convert Input back to Base Unit for Calculation
+            y_measured_base = to_base(y_measured_disp, analyte, selected_unit)
+            M = y_measured_base - A_lit * np.cos(2 * np.pi * (t1_hour - t0_lit) / 24)
             
         st.markdown("**2. Manual Adjustments**")
         if st.checkbox("Enable Editor Mode"):
-            A = st.slider("Amplitude A", 1.0, 50.0, float(A_lit), 0.5)
-            M = st.slider("Mean M", 0.0, 300.0, float(M), 1.0, disabled=personalize_mode)
+            # Sliders operate in Base Units (approximate scaling)
+            A = st.slider(f"Amplitude A (Base: {unit_options[0]})", 0.1, 50.0, float(A_lit), 0.1)
+            M = st.slider(f"Mean M (Base: {unit_options[0]})", 0.0, 300.0, float(M), 0.5, disabled=personalize_mode)
             t0 = st.slider("Acrophase t₀ (h)", 0.0, 24.0, t0_lit, 0.1)
             MU_perc = st.slider("Uncertainty MU %", 1.0, 50.0, float(MU_perc_lit), 0.5)
         else:
@@ -353,19 +388,25 @@ with tab1:
         mu_abs = M * MU_perc / 100
 
     with right:
+        # Calculate Curve in Base Units
         t_arr = np.linspace(0, 24, 500)
         y_arr = circadian(t_arr, M, A, t0)
-        y_disp = y_arr / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else y_arr
-        mu_disp = mu_abs / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else mu_abs
+        
+        # Convert Curve to Display Units
+        y_disp = to_display(y_arr, analyte, selected_unit)
+        mu_disp = to_display(mu_abs, analyte, selected_unit)
 
         fig_sin, ax_sin = plt.subplots(figsize=(10, 3.5), facecolor='white')
         ax_sin.set_title(f"Simulated Diurnal Fluctuation for {analyte}", fontsize=12)
         ax_sin.plot(t_arr, y_disp, color="cornflowerblue", alpha=0.9, lw=2, label="Expected Profile")
         ax_sin.axvline(t1_hour, color="black", ls="-", lw=2, label=f"t₁ = {format_time_string(t1_hour)}")
         ax_sin.fill_between(t_arr, y_disp - mu_disp, y_disp + mu_disp, color="gray", alpha=0.15, label=f"Tolerance (±{MU_perc}%)")
+        
         if personalize_mode:
-             ax_sin.plot(t1_hour, y_measured, 'o', color='black', markersize=6)
-        ax_sin.set_xlabel("Time of Day (h)"); ax_sin.set_ylabel(f"Concentration ({unit})")
+             # Plot the measured point (already in display units from input)
+             ax_sin.plot(t1_hour, y_measured_disp, 'o', color='black', markersize=6)
+             
+        ax_sin.set_xlabel("Time of Day (h)"); ax_sin.set_ylabel(f"Concentration ({selected_unit})")
         ax_sin.legend(loc='upper right', frameon=True, facecolor='white', framealpha=1)
         ax_sin.set_xlim(0, 24)
         st.pyplot(fig_sin)
@@ -381,25 +422,36 @@ with tab1:
             
         with row1_c2:
             st.markdown("##### 24h Clock Comparison")
-            y_t1 = circadian(t1_hour, M, A, t0)
-            y_t2 = circadian(t2_hour, M, A, t0)
-            diff = abs(y_t1 - y_t2)
-            conv = GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else 1.0
-            if diff <= mu_abs: 
-                st.success(f"**Comparable**\nΔ = {diff/conv:.1f} (≤ {mu_abs/conv:.1f})")
+            # Calculate values in Base units
+            y_t1_base = circadian(t1_hour, M, A, t0)
+            y_t2_base = circadian(t2_hour, M, A, t0)
+            diff_base = abs(y_t1_base - y_t2_base)
+            
+            # Convert difference to display unit for Text
+            diff_disp = to_display(diff_base, analyte, selected_unit)
+            mu_abs_disp = to_display(mu_abs, analyte, selected_unit) # Threshold in display units
+            
+            if diff_base <= mu_abs: 
+                st.success(f"**Comparable**\nΔ = {diff_disp:.1f} (≤ {mu_abs_disp:.1f})")
             else: 
-                st.error(f"**Not Comparable**\nΔ = {diff/conv:.1f} (> {mu_abs/conv:.1f})")
+                st.error(f"**Not Comparable**\nΔ = {diff_disp:.1f} (> {mu_abs_disp:.1f})")
 
         row2_c1, row2_c2 = st.columns(2, gap="medium")
         
         with row2_c1:
             T1, T2, delta = chronomap_delta(A, M, t0)
-            delta_disp = delta / GLUCOSE_CONVERSION_FACTOR if unit == 'mmol/L' else delta
+            # Map values need to be converted for colorbar
+            delta_disp = to_display(delta, analyte, selected_unit)
             
             fig_cm, ax_cm = plt.subplots(figsize=(5, 5), facecolor='white')
             pcm = ax_cm.pcolormesh(T2, T1, delta_disp, cmap="coolwarm", shading='gouraud')
-            fig_cm.colorbar(pcm, ax=ax_cm, label=f"Diff ({unit})", fraction=0.046, pad=0.04)
+            fig_cm.colorbar(pcm, ax=ax_cm, label=f"Diff ({selected_unit})", fraction=0.046, pad=0.04)
+            
+            # Contour lines use Base Units because delta is calculated in base units? 
+            # No, we want the line to be at mu_abs.
+            # Contour uses the grid 'delta'. We must check against mu_abs (base).
             ax_cm.contour(T2, T1, delta, levels=[mu_abs], colors='black', linestyles='dotted')
+            
             ax_cm.axhline(t1_hour, color='black', ls='-', lw=2.5, label='t₁')
             ax_cm.axvline(t2_hour, color='#ff7f0e', ls='--', lw=2.5, label='t₂') 
             ax_cm.plot(t2_hour, t1_hour, 'ko', markersize=7, mfc='white')
@@ -411,9 +463,12 @@ with tab1:
             
         with row2_c2:
             norm = lambda y: 0.1 + 0.9 * ((y - (M-A)) / (2*A))
-            r1, r2 = np.clip(norm(y_t1), 0, 1), np.clip(norm(y_t2), 0, 1)
+            r1, r2 = np.clip(norm(y_t1_base), 0, 1), np.clip(norm(y_t2_base), 0, 1)
             theta1, theta2 = (t1_hour/24)*2*np.pi, (t2_hour/24)*2*np.pi
-            y1_d = y_t1/conv; y2_d = y_t2/conv
+            
+            # Label values in Display Unit
+            y1_d = to_display(y_t1_base, analyte, selected_unit)
+            y2_d = to_display(y_t2_base, analyte, selected_unit)
             
             fig_clk, ax_clk = plt.subplots(subplot_kw={'projection':'polar'}, figsize=(6, 4), facecolor='white')
             ax_clk.set_theta_offset(np.pi/2); ax_clk.set_theta_direction(-1)
@@ -449,6 +504,7 @@ with tab2:
 
     if valid_dfs:
         df_combined = pd.concat(valid_dfs, ignore_index=True)
+        # Ensure Analyte formatting
         df_combined['analyte'] = df_combined['analyte'].str.strip().str.title()
         
         st.success(f"Loaded {len(df_combined)} records.")
